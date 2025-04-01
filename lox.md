@@ -6,3 +6,5 @@ A high-level interpreted language written in Go and C.
 - Functions/Closures
 - Automatic Memory Management
 - Classes/Objects
+- Block c-style comments
+- Multi-line string literals
