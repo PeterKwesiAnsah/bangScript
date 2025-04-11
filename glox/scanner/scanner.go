@@ -139,8 +139,8 @@ func ScanTokens(source []byte) ([]*Token, error) {
 			sp.line++
 		case '!':
 			tokenType := BANG
-			c, isEOF := peek(source, sp.current)
-			if !isEOF && c == '=' {
+			c, _ := peek(source, sp.current)
+			if c == '=' {
 				tokenType = BANG_EQUAL
 				//consume '='
 				sp.current++
@@ -148,8 +148,8 @@ func ScanTokens(source []byte) ([]*Token, error) {
 			tokens = addToken(tokens, sp.line, "", tokenType)
 		case '=':
 			tokenType := EQUAL
-			c, isEOF := peek(source, sp.current)
-			if !isEOF && c == '=' {
+			c, _ := peek(source, sp.current)
+			if c == '=' {
 				tokenType = EQUAL_EQUAL
 				//consume '='
 				sp.current++
@@ -157,8 +157,8 @@ func ScanTokens(source []byte) ([]*Token, error) {
 			tokens = addToken(tokens, sp.line, "", tokenType)
 		case '<':
 			tokenType := LESS
-			c, isEOF := peek(source, sp.current)
-			if !isEOF && c == '=' {
+			c, _ := peek(source, sp.current)
+			if c == '=' {
 				tokenType = LESS_EQUAL
 				//consume '='
 				sp.current++
@@ -166,8 +166,8 @@ func ScanTokens(source []byte) ([]*Token, error) {
 			tokens = addToken(tokens, sp.line, "", tokenType)
 		case '>':
 			tokenType := LESS
-			c, isEOF := peek(source, sp.current)
-			if !isEOF && c == '=' {
+			c, _ := peek(source, sp.current)
+			if c == '=' {
 				tokenType = GREATER_EQUAL
 				//consume '='
 				sp.current++
