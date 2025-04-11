@@ -265,7 +265,7 @@ func ScanTokens(source []byte) ([]*Token, error) {
 							continue
 						}
 						//c on this line is a non-digit
-						
+						return nil, fmt.Errorf("Invalid Float")
 					} else {
 						break
 					}
