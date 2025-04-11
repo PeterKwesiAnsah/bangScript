@@ -136,7 +136,7 @@ func ScanTokens(source []byte) ([]*Token, error) {
 		case '\t':
 		// Ignore whitespace.
 		case '\n':
-			sp.current++
+			sp.line++
 		case '!':
 			tokenType := BANG
 			c, isEOF := peek(source, sp.current)

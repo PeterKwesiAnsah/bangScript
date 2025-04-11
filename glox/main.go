@@ -1,7 +1,4 @@
 /*
-TODO: run interpretor via path to source code file
-*/
-/*
 TODO: run interpretor through interactive prompt (REPL)
 */
 package main
