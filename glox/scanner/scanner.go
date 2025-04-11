@@ -210,6 +210,7 @@ func ScanTokens(source []byte) ([]*Token, error) {
 							if c == '\n' {
 								sp.line++
 							}
+							//consume new line
 							sp.current++
 						}
 						if slashStarCount == 0 {
@@ -228,6 +229,7 @@ func ScanTokens(source []byte) ([]*Token, error) {
 			//string
 			for {
 				c, isEOF := peek(source, sp.current)
+				//support for multi-line strings
 				if c == '\n' {
 					sp.line = sp.line + 1
 				}
@@ -242,6 +244,7 @@ func ScanTokens(source []byte) ([]*Token, error) {
 				}
 				sp.current++
 			}
+			//what kind of allocation does the string memory array have???
 			tokens = addToken(tokens, sp.line, string(source[sp.start+1:sp.current-1]), STRING)
 		default:
 			if isDigit(c) {
@@ -261,6 +264,8 @@ func ScanTokens(source []byte) ([]*Token, error) {
 							sp.current++
 							continue
 						}
+						//c on this line is a non-digit
+						
 					} else {
 						break
 					}
