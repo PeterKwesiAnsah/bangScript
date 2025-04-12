@@ -90,7 +90,7 @@ func addToken(tokens []*Token, line int, lexem string, ttype Tokentype) []*Token
 }
 
 func peekNext(source string, current int) (byte, bool) {
-	isEOF := len(source) >= current+1
+	isEOF := current+1 >= len(source)
 	if isEOF {
 		//null character
 		return 0, true
@@ -98,7 +98,7 @@ func peekNext(source string, current int) (byte, bool) {
 	return source[current+1], false
 }
 func peek(source string, current int) (byte, bool) {
-	isEOF := len(source) >= current
+	isEOF := current >= len(source)
 	if isEOF {
 		//null character
 		return 0, true
@@ -115,7 +115,7 @@ func ScanTokens(source string) ([]*Token, error) {
 		sp.start = sp.current
 		c := source[sp.current]
 		//update current to hold the array index of the next character
-		sp.current = sp.current + 1
+		sp.current++
 		switch c {
 		case '(':
 			tokens = addToken(tokens, sp.line, "", LEFT_PAREN)
@@ -131,18 +131,19 @@ func ScanTokens(source string) ([]*Token, error) {
 			tokens = addToken(tokens, sp.line, "", MINUS)
 		case '*':
 			tokens = addToken(tokens, sp.line, "", STAR)
-		case ' ':
-		case '\r':
-		case '\t':
-		// Ignore whitespace.
-		case '\n':
-			sp.line++
+		case ';':
+			tokens = addToken(tokens, sp.line, "", SEMICOLON)
+		case ',':
+			tokens = addToken(tokens, sp.line, "", COMMA)
+		case '.':
+			tokens = addToken(tokens, sp.line, "", DOT)
 		case '!':
+			fmt.Println("Matched '!'")
 			tokenType := BANG
 			c, _ := peek(source, sp.current)
+			fmt.Printf("Next current and char with source length: %d %c %d\n", sp.current, source[sp.current], len(source))
 			if c == '=' {
 				tokenType = BANG_EQUAL
-				//consume '='
 				sp.current++
 			}
 			tokens = addToken(tokens, sp.line, "", tokenType)
@@ -246,6 +247,12 @@ func ScanTokens(source string) ([]*Token, error) {
 			}
 			//what kind of allocation does the string memory array have???
 			tokens = addToken(tokens, sp.line, string(source[sp.start+1:sp.current-1]), STRING)
+		case ' ':
+		case '\r':
+		case '\t':
+		// Ignore whitespace.
+		case '\n':
+			sp.line++
 		default:
 			if isDigit(c) {
 				//number
@@ -306,10 +313,11 @@ func ScanTokens(source string) ([]*Token, error) {
 				}
 				tokens = addToken(tokens, sp.line, id, tt)
 			} else {
-				return nil, fmt.Errorf("Unexpected Character")
+				return nil, fmt.Errorf("Unexpected Character '%c'", c)
 			}
 		}
 	}
+
 	tokens = addToken(tokens, sp.line, "", EOF)
 	return tokens, nil
 }

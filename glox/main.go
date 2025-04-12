@@ -20,7 +20,9 @@ func main() {
 			fmt.Errorf("Failed to open file :%w\n", err)
 			os.Exit(1)
 		}
-		fileStat, err := fp.Stat()
+		fmt.Printf("buffer size %d, buffer as array size %d\n", len(buf), len(string(buf)))
+		return
+		tokens, err := scanner.ScanTokens(string(buf))
 		if err != nil {
 			fmt.Errorf("%w\n", err)
 			os.Exit(1)
