@@ -138,10 +138,8 @@ func ScanTokens(source string) ([]*Token, error) {
 		case '.':
 			tokens = addToken(tokens, sp.line, "", DOT)
 		case '!':
-			fmt.Println("Matched '!'")
 			tokenType := BANG
 			c, _ := peek(source, sp.current)
-			fmt.Printf("Next current and char with source length: %d %c %d\n", sp.current, source[sp.current], len(source))
 			if c == '=' {
 				tokenType = BANG_EQUAL
 				sp.current++
@@ -166,7 +164,7 @@ func ScanTokens(source string) ([]*Token, error) {
 			}
 			tokens = addToken(tokens, sp.line, "", tokenType)
 		case '>':
-			tokenType := LESS
+			tokenType := GREATER
 			c, _ := peek(source, sp.current)
 			if c == '=' {
 				tokenType = GREATER_EQUAL
@@ -186,6 +184,8 @@ func ScanTokens(source string) ([]*Token, error) {
 						if c == '\n' || isEOF {
 							if c == '\n' {
 								sp.line++
+								//consume new line
+								sp.current++
 							}
 							break
 						}
@@ -211,7 +211,7 @@ func ScanTokens(source string) ([]*Token, error) {
 							if c == '\n' {
 								sp.line++
 							}
-							//consume new line
+							//skip characters
 							sp.current++
 						}
 						if slashStarCount == 0 {
@@ -232,7 +232,7 @@ func ScanTokens(source string) ([]*Token, error) {
 				c, isEOF := peek(source, sp.current)
 				//support for multi-line strings
 				if c == '\n' {
-					sp.line = sp.line + 1
+					sp.line++
 				}
 				if c == '"' || isEOF {
 					if isEOF {
@@ -278,13 +278,14 @@ func ScanTokens(source string) ([]*Token, error) {
 					}
 				}
 				tokens = addToken(tokens, sp.line, string(source[sp.start:sp.current]), NUMBER)
-			} else if isAlphaNumber(c) {
+			} else if isAlphaNumber(c) || c == '_' {
 				for {
-					c, isEOF := peek(source, sp.current)
-					if !isAlphaNumber(c) || isEOF {
-						break
+					c, _ := peek(source, sp.current)
+					if isAlphaNumber(c) || c == '_' {
+						sp.current++
+						continue
 					}
-					sp.current++
+					break
 				}
 				//handle identifiers/keywords here
 				tt := IDENTIFIER
