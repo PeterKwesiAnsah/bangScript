@@ -7,10 +7,10 @@ import (
 type Tokentype int
 type Token struct {
 	//Represents the token type of the word.
-	ttype Tokentype
+	Ttype Tokentype
 	// line represents the line number in which the token was emitted.
-	line  int
-	lexem string
+	Line  int
+	Lexem string
 }
 
 type sprop struct {
@@ -82,11 +82,11 @@ func isAlphaNumber(c byte) bool {
 }
 
 func addToken(tokens []*Token, line int, lexem string, ttype Tokentype) []*Token {
-	token := new(Token)
-	token.line = line
-	token.lexem = lexem
-	token.ttype = ttype
-	return append(tokens, token)
+	token := Token{}
+	token.Line = line
+	token.Lexem = lexem
+	token.Ttype = ttype
+	return append(tokens, &token)
 }
 
 func peekNext(source string, current int) (byte, bool) {
