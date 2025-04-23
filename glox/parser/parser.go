@@ -17,6 +17,8 @@ type binary struct {
 	right    exp
 }
 
+// TODO: handle multiple expression rule
+// TODO: handle tenary expression rule
 type unary struct {
 	operator *scanner.Token
 	right    exp
@@ -38,30 +40,134 @@ func Parser(tkn tokens) (exp, error) {
 }
 
 func (tkn tokens) expression() (exp, error) {
-	var temp exp
-	return temp, nil
+	return tkn.equality()
 }
 
 func (tkn tokens) equality() (exp, error) {
-	var temp exp
-	return temp, nil
+	cexpleft, err := tkn.comparison()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		if cToken.Ttype == scanner.EQUAL_EQUAL || cToken.Ttype == scanner.BANG_EQUAL {
+			//consume operator terminal
+			current++
+			op := cToken
+			cexpright, err := tkn.comparison()
+			if err != nil {
+				return nil, err
+			}
+			cexpleft = &binary{left: cexpleft, operator: op, right: cexpright}
+		}
+		break
+	}
+	return cexpleft, nil
 }
 func (tkn tokens) comparison() (exp, error) {
-	var temp exp
-	return temp, nil
+	texpleft, err := tkn.term()
+	opsToMatch := []scanner.Tokentype{
+		scanner.GREATER,
+		scanner.GREATER_EQUAL,
+		scanner.LESS,
+		scanner.LESS_EQUAL,
+	}
+	if err != nil {
+		return nil, err
+	}
+Matching_Loop:
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		for _, op := range opsToMatch {
+			if cToken.Ttype == op {
+				//consume operator terminal
+				current++
+				op := cToken
+				texpright, err := tkn.term()
+				if err != nil {
+					return nil, err
+				}
+				texpleft = &binary{left: texpleft, operator: op, right: texpright}
+				break Matching_Loop
+			}
+		}
+	}
+	return texpleft, nil
 }
 func (tkn tokens) term() (exp, error) {
-	var temp exp
-	return temp, nil
+	fexpleft, err := tkn.factor()
+	opsToMatch := []scanner.Tokentype{
+		scanner.PLUS,
+		scanner.MINUS,
+	}
+	if err != nil {
+		return nil, err
+	}
+Matching_Loop:
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		for _, op := range opsToMatch {
+			if cToken.Ttype == op {
+				//consume operator terminal
+				current++
+				op := cToken
+				fexpright, err := tkn.factor()
+				if err != nil {
+					return nil, err
+				}
+				fexpleft = &binary{left: fexpleft, operator: op, right: fexpright}
+				break Matching_Loop
+			}
+		}
+	}
+	return fexpleft, nil
 }
 
 func (tkn tokens) factor() (exp, error) {
-	var temp exp
-	return temp, nil
+	uexpleft, err := tkn.unary()
+	opsToMatch := []scanner.Tokentype{
+		scanner.STAR,
+		scanner.SLASH,
+	}
+	if err != nil {
+		return nil, err
+	}
+Matching_Loop:
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		for _, op := range opsToMatch {
+			if cToken.Ttype == op {
+				//consume operator terminal
+				current++
+				op := cToken
+				fexpright, err := tkn.unary()
+				if err != nil {
+					return nil, err
+				}
+				uexpleft = &binary{left: uexpleft, operator: op, right: fexpright}
+				break Matching_Loop
+			}
+		}
+	}
+	return uexpleft, nil
 }
 func (tkn tokens) unary() (exp, error) {
-	var temp exp
-	return temp, nil
+	uToken := tkn[current]
+	if uToken.Ttype == scanner.BANG || uToken.Ttype == scanner.MINUS {
+		op := uToken
+		//consume operator terminal
+		current++
+		uexp, err := tkn.unary()
+		if err != nil {
+			return nil, err
+		}
+		return &unary{operator: op, right: uexp}, nil
+	}
+	return tkn.primary()
 }
 func (tkn tokens) primary() (exp, error) {
 	ttype := tkn[current].Ttype
@@ -77,6 +183,7 @@ func (tkn tokens) primary() (exp, error) {
 		if current+1 >= len(tkn) {
 			return nil, fmt.Errorf("Expected an expression token but got EOF")
 		}
+		current++
 		exp, err := tkn.expression()
 		if err != nil {
 			return nil, err
