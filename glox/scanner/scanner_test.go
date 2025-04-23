@@ -13,8 +13,8 @@ func TestEmptySource(t *testing.T) {
 		t.Fatalf("Expected 1 token (EOF), got %d", len(tokens))
 	}
 
-	if tokens[0].ttype != EOF {
-		t.Errorf("Expected EOF token, got %v", tokens[0].ttype)
+	if tokens[0].Ttype != EOF {
+		t.Errorf("Expected EOF token, got %v", tokens[0].Ttype)
 	}
 }
 
@@ -39,8 +39,8 @@ func TestSingleCharacterTokens(t *testing.T) {
 	}
 
 	for i, expected := range expectedTypes {
-		if i < len(tokens) && tokens[i].ttype != expected {
-			t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+		if i < len(tokens) && tokens[i].Ttype != expected {
+			t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 		}
 	}
 }
@@ -67,12 +67,12 @@ func TestOneOrTwoCharacterTokens(t *testing.T) {
 			tokens, _ := ScanTokens(tc.source)
 
 			if len(tokens) != len(tc.expected) {
-				t.Fatalf("Expected %d tokens, got %d (%d-%d-%d)", len(tc.expected), len(tokens), tokens[0].ttype, tokens[1].ttype, tokens[2].ttype)
+				t.Fatalf("Expected %d tokens, got %d (%d-%d-%d)", len(tc.expected), len(tokens), tokens[0].Ttype, tokens[1].Ttype, tokens[2].Ttype)
 			}
 
 			for i, expected := range tc.expected {
-				if tokens[i].ttype != expected {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+				if tokens[i].Ttype != expected {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 				}
 			}
 		})
@@ -113,8 +113,8 @@ func TestLineComments(t *testing.T) {
 			}
 
 			for i, expected := range tc.expected {
-				if tokens[i].ttype != expected {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+				if tokens[i].Ttype != expected {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 				}
 			}
 		})
@@ -184,8 +184,8 @@ func TestBlockComments(t *testing.T) {
 			}
 
 			for i, expected := range tc.expected {
-				if tokens[i].ttype != expected {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+				if tokens[i].Ttype != expected {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 				}
 			}
 		})
@@ -225,8 +225,8 @@ func TestNestedBlockComments(t *testing.T) {
 			}
 
 			for i, expected := range tc.expected {
-				if tokens[i].ttype != expected {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+				if tokens[i].Ttype != expected {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 				}
 			}
 		})
@@ -287,11 +287,11 @@ func TestWhitespace(t *testing.T) {
 	}
 
 	for i, expected := range expectedTypes {
-		if tokens[i].ttype != expected {
-			t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+		if tokens[i].Ttype != expected {
+			t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 		}
-		if tokens[i].lexem != expectedLexemes[i] {
-			t.Errorf("Expected lexeme[%d] to be %q, got %q", i, expectedLexemes[i], tokens[i].lexem)
+		if tokens[i].Lexem != expectedLexemes[i] {
+			t.Errorf("Expected lexeme[%d] to be %q, got %q", i, expectedLexemes[i], tokens[i].Lexem)
 		}
 	}
 }
@@ -334,11 +334,11 @@ func TestStrings(t *testing.T) {
 			}
 
 			for i, token := range tokens {
-				if token.ttype != tc.expected[i] {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, tc.expected[i], token.ttype)
+				if token.Ttype != tc.expected[i] {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, tc.expected[i], token.Ttype)
 				}
-				if token.lexem != tc.lexemes[i] {
-					t.Errorf("Expected lexeme[%d] to be %q, got %q", i, tc.lexemes[i], token.lexem)
+				if token.Lexem != tc.lexemes[i] {
+					t.Errorf("Expected lexeme[%d] to be %q, got %q", i, tc.lexemes[i], token.Lexem)
 				}
 			}
 		})
@@ -388,11 +388,11 @@ func TestNumbers(t *testing.T) {
 			}
 
 			for i, token := range tokens {
-				if token.ttype != tc.expected[i] {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, tc.expected[i], token.ttype)
+				if token.Ttype != tc.expected[i] {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, tc.expected[i], token.Ttype)
 				}
-				if token.lexem != tc.lexemes[i] {
-					t.Errorf("Expected lexeme[%d] to be %q, got %q", i, tc.lexemes[i], token.lexem)
+				if token.Lexem != tc.lexemes[i] {
+					t.Errorf("Expected lexeme[%d] to be %q, got %q", i, tc.lexemes[i], token.Lexem)
 				}
 			}
 		})
@@ -454,11 +454,11 @@ func TestIdentifiers(t *testing.T) {
 			}
 
 			for i, token := range tokens {
-				if token.ttype != tc.expected[i] {
-					t.Errorf("Expected token[%d] to be %v, got %v", i, tc.expected[i], token.ttype)
+				if token.Ttype != tc.expected[i] {
+					t.Errorf("Expected token[%d] to be %v, got %v", i, tc.expected[i], token.Ttype)
 				}
-				if token.lexem != tc.lexemes[i] {
-					t.Errorf("Expected lexeme[%d] to be %q, got %q", i, tc.lexemes[i], token.lexem)
+				if token.Lexem != tc.lexemes[i] {
+					t.Errorf("Expected lexeme[%d] to be %q, got %q", i, tc.lexemes[i], token.Lexem)
 				}
 			}
 		})
@@ -511,8 +511,8 @@ print test.getValue(); /* Should print 42 */
 	}
 
 	for i, expected := range expectedTypes {
-		if tokens[i].ttype != expected {
-			t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].ttype)
+		if tokens[i].Ttype != expected {
+			t.Errorf("Expected token[%d] to be %v, got %v", i, expected, tokens[i].Ttype)
 		}
 	}
 }
@@ -565,8 +565,8 @@ print "Count: " + counter.increment(); /* Should print "Count: 1" */
 
 	// Verify last token is EOF
 	lastToken := tokens[len(tokens)-1]
-	if lastToken.ttype != EOF {
-		t.Errorf("Expected last token to be EOF, got %v", lastToken.ttype)
+	if lastToken.Ttype != EOF {
+		t.Errorf("Expected last token to be EOF, got %v", lastToken.Ttype)
 	}
 }
 
@@ -588,8 +588,8 @@ line 6`
 	}
 
 	for i, token := range tokens {
-		if token.line != expectedLines[i] {
-			t.Errorf("Expected token[%d] to have line %d, got %d", i, expectedLines[i], token.line)
+		if token.Line != expectedLines[i] {
+			t.Errorf("Expected token[%d] to have line %d, got %d", i, expectedLines[i], token.Line)
 		}
 	}
 }
@@ -604,12 +604,12 @@ func TestMultilineString(t *testing.T) {
 		t.Fatalf("Expected 2 tokens, got %d", len(tokens))
 	}
 
-	if tokens[0].ttype != STRING {
-		t.Errorf("Expected STRING token, got %v", tokens[0].ttype)
+	if tokens[0].Ttype != STRING {
+		t.Errorf("Expected STRING token, got %v", tokens[0].Ttype)
 	}
 
-	if tokens[0].line != 3 {
-		t.Errorf("Expected string token to end on line 3, got %d", tokens[0].line)
+	if tokens[0].Line != 3 {
+		t.Errorf("Expected string token to end on line 3, got %d", tokens[0].Line)
 	}
 }
 
@@ -634,11 +634,11 @@ line 7`
 	}
 
 	for i, token := range tokens {
-		if token.line != expectedLines[i] {
-			t.Errorf("Expected token[%d] to have line %d, got %d", i, expectedLines[i], token.line)
+		if token.Line != expectedLines[i] {
+			t.Errorf("Expected token[%d] to have line %d, got %d", i, expectedLines[i], token.Line)
 		}
-		if token.lexem != expectedLexemes[i] {
-			t.Errorf("Expected lexeme[%d] to be %q, got %q", i, expectedLexemes[i], token.lexem)
+		if token.Lexem != expectedLexemes[i] {
+			t.Errorf("Expected lexeme[%d] to be %q, got %q", i, expectedLexemes[i], token.Lexem)
 		}
 	}
 }
