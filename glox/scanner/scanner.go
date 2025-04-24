@@ -35,6 +35,8 @@ const (
 	SEMICOLON
 	SLASH
 	STAR
+	QUESTION
+	COLON
 	// One or two character tokens.
 	BANG
 	BANG_EQUAL
@@ -135,6 +137,10 @@ func ScanTokens(source string) ([]*Token, error) {
 			tokens = addToken(tokens, sp.line, "", SEMICOLON)
 		case ',':
 			tokens = addToken(tokens, sp.line, "", COMMA)
+		case '?':
+			tokens = addToken(tokens, sp.line, "", QUESTION)
+		case ':':
+			tokens = addToken(tokens, sp.line, "", COLON)
 		case '.':
 			tokens = addToken(tokens, sp.line, "", DOT)
 		case '!':
