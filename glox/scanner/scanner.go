@@ -46,6 +46,7 @@ const (
 	GREATER_EQUAL
 	LESS
 	LESS_EQUAL
+	TENARY
 	// Literals.
 	IDENTIFIER
 	STRING
