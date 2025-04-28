@@ -17,6 +17,14 @@ type binary struct {
 	right    exp
 }
 
+// for handling conditional operations
+type tenary struct {
+	condition exp
+	operator  *scanner.Token
+	then      exp
+	elsef     exp
+}
+
 // TODO: handle multiple expression rule
 // TODO: handle tenary expression rule
 type unary struct {
@@ -32,6 +40,7 @@ type primary struct {
 func (exp *binary) print()  {}
 func (exp *unary) print()   {}
 func (exp *primary) print() {}
+func (exp *tenary) print()  {}
 
 var current int = 0
 
@@ -39,8 +48,75 @@ func Parser(tkn tokens) (exp, error) {
 	return tkn.expression()
 }
 
+// TODO:tenary expression
+// TODO:nested tenary expression
+// TODO:precedence
+func (tkn tokens) tenary() (exp, error) {
+	//may have a condition expression or not
+	eexpleft, err := tkn.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	eToken := tkn[current]
+	// find the comma operator terminal
+	if eToken.Ttype == scanner.QUESTION {
+		//consume question (?)
+		current++
+		//then expression
+		//call from the top ?? call multiple to handle comma seperated operations
+		expthen, err := tkn.equality()
+		if err != nil {
+			return nil, err
+		}
+		if (tkn[current].Ttype) != scanner.COLON {
+			return nil, fmt.Errorf("Expected the COLON token but got %d", tkn[current].Ttype)
+		}
+		//consume colon (:)
+		current++
+		//handle else expression
+		expelse, err := tkn.equality()
+		if err != nil {
+			return nil, err
+		}
+		//create a tenary
+		tenaryOp := &scanner.Token{
+			Ttype: scanner.TENARY,
+		}
+		eexpleft = &tenary{condition: eexpleft, operator: tenaryOp, then: expthen, elsef: expelse}
+		//continue
+	}
+
+	return eexpleft, nil
+}
+
+func (tkn tokens) multiple() (exp, error) {
+	texpleft, err := tkn.tenary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		tToken := tkn[current]
+		// find the comma operator terminal
+		if tToken.Ttype == scanner.COMMA {
+			op := tToken
+			//consume comma(,)
+			current++
+			texpright, err := tkn.tenary()
+			if err != nil {
+				return nil, err
+			}
+			texpleft = &binary{left: texpleft, operator: op, right: texpright}
+			continue
+		}
+		break
+	}
+	return texpleft, nil
+}
+
 func (tkn tokens) expression() (exp, error) {
-	return tkn.equality()
+	return tkn.multiple()
 }
 
 func (tkn tokens) equality() (exp, error) {
@@ -52,7 +128,7 @@ func (tkn tokens) equality() (exp, error) {
 		cToken := tkn[current]
 		// find the operator terminal
 		if cToken.Ttype == scanner.EQUAL_EQUAL || cToken.Ttype == scanner.BANG_EQUAL {
-			//consume operator terminal
+			//consume operator terminal(==,!=)
 			current++
 			op := cToken
 			cexpright, err := tkn.comparison()
