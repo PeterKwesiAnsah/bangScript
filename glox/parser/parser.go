@@ -5,7 +5,7 @@ import (
 	"lox/glox/scanner"
 )
 
-type tokens []*scanner.Token
+type Tokens []*scanner.Token
 
 type exp interface {
 	print()
@@ -37,21 +37,24 @@ type primary struct {
 }
 
 // implement the exp interface
-func (exp *binary) print()  {}
-func (exp *unary) print()   {}
-func (exp *primary) print() {}
-func (exp *tenary) print()  {}
+func (exp binary) print()  {}
+func (exp unary) print()   {}
+func (exp primary) print() {}
+func (exp tenary) print()  {}
 
 var current int = 0
 
-func Parser(tkn tokens) (exp, error) {
-	return tkn.expression()
+func Parser(tkn Tokens) (exp, error) {
+	exp, err := tkn.expression()
+	//For testing cases, we need to reset the current counter
+	current = 0
+	return exp, err
 }
 
 // TODO:tenary expression
 // TODO:nested tenary expression
 // TODO:precedence
-func (tkn tokens) tenary() (exp, error) {
+func (tkn Tokens) tenary() (exp, error) {
 	//may have a condition expression or not
 	eexpleft, err := tkn.equality()
 	if err != nil {
@@ -83,19 +86,18 @@ func (tkn tokens) tenary() (exp, error) {
 		tenaryOp := &scanner.Token{
 			Ttype: scanner.TENARY,
 		}
-		eexpleft = &tenary{condition: eexpleft, operator: tenaryOp, then: expthen, elsef: expelse}
+		eexpleft = tenary{condition: eexpleft, operator: tenaryOp, then: expthen, elsef: expelse}
 		//continue
 	}
 
 	return eexpleft, nil
 }
 
-func (tkn tokens) multiple() (exp, error) {
+func (tkn Tokens) multiple() (exp, error) {
 	texpleft, err := tkn.tenary()
 	if err != nil {
 		return nil, err
 	}
-
 	for {
 		tToken := tkn[current]
 		// find the comma operator terminal
@@ -107,7 +109,7 @@ func (tkn tokens) multiple() (exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			texpleft = &binary{left: texpleft, operator: op, right: texpright}
+			texpleft = binary{left: texpleft, operator: op, right: texpright}
 			continue
 		}
 		break
@@ -115,11 +117,11 @@ func (tkn tokens) multiple() (exp, error) {
 	return texpleft, nil
 }
 
-func (tkn tokens) expression() (exp, error) {
-	return tkn.multiple()
+func (tkn Tokens) expression() (exp, error) {
+	return tkn.equality()
 }
 
-func (tkn tokens) equality() (exp, error) {
+func (tkn Tokens) equality() (exp, error) {
 	cexpleft, err := tkn.comparison()
 	if err != nil {
 		return nil, err
@@ -135,13 +137,13 @@ func (tkn tokens) equality() (exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			cexpleft = &binary{left: cexpleft, operator: op, right: cexpright}
+			cexpleft = binary{left: cexpleft, operator: op, right: cexpright}
 		}
 		break
 	}
 	return cexpleft, nil
 }
-func (tkn tokens) comparison() (exp, error) {
+func (tkn Tokens) comparison() (exp, error) {
 	texpleft, err := tkn.term()
 	opsToMatch := []scanner.Tokentype{
 		scanner.GREATER,
@@ -165,14 +167,15 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				texpleft = &binary{left: texpleft, operator: op, right: texpright}
+				texpleft = binary{left: texpleft, operator: op, right: texpright}
 				break Matching_Loop
 			}
 		}
+		break
 	}
 	return texpleft, nil
 }
-func (tkn tokens) term() (exp, error) {
+func (tkn Tokens) term() (exp, error) {
 	fexpleft, err := tkn.factor()
 	opsToMatch := []scanner.Tokentype{
 		scanner.PLUS,
@@ -194,15 +197,16 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				fexpleft = &binary{left: fexpleft, operator: op, right: fexpright}
+				fexpleft = binary{left: fexpleft, operator: op, right: fexpright}
 				break Matching_Loop
 			}
 		}
+		break
 	}
 	return fexpleft, nil
 }
 
-func (tkn tokens) factor() (exp, error) {
+func (tkn Tokens) factor() (exp, error) {
 	uexpleft, err := tkn.unary()
 	opsToMatch := []scanner.Tokentype{
 		scanner.STAR,
@@ -224,14 +228,16 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				uexpleft = &binary{left: uexpleft, operator: op, right: fexpright}
+				uexpleft = binary{left: uexpleft, operator: op, right: fexpright}
 				break Matching_Loop
 			}
 		}
+		break
+		//fmt.Println("Stuck here")
 	}
 	return uexpleft, nil
 }
-func (tkn tokens) unary() (exp, error) {
+func (tkn Tokens) unary() (exp, error) {
 	uToken := tkn[current]
 	if uToken.Ttype == scanner.BANG || uToken.Ttype == scanner.MINUS {
 		op := uToken
@@ -241,15 +247,16 @@ func (tkn tokens) unary() (exp, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &unary{operator: op, right: uexp}, nil
+		return unary{operator: op, right: uexp}, nil
 	}
 	return tkn.primary()
 }
-func (tkn tokens) primary() (exp, error) {
+func (tkn Tokens) primary() (exp, error) {
 	ttype := tkn[current].Ttype
 	tnode := primary{}
 	switch ttype {
 	case scanner.IDENTIFIER:
+	case scanner.NUMBER:
 	case scanner.STRING:
 	case scanner.TRUE:
 	case scanner.FALSE:
@@ -274,5 +281,5 @@ func (tkn tokens) primary() (exp, error) {
 	}
 	tnode.node = tkn[current]
 	current++
-	return &tnode, nil
+	return tnode, nil
 }
