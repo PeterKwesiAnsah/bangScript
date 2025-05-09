@@ -117,6 +117,8 @@ func (tkn Tokens) multiple() (exp, error) {
 	return texpleft, nil
 }
 
+// TODO: implement grammer for logical operators && and ||
+// TODO: binary operators without left hand operands , report error but continue passing
 func (tkn Tokens) expression() (exp, error) {
 	return tkn.equality()
 }
@@ -261,7 +263,7 @@ func (tkn Tokens) primary() (exp, error) {
 	case scanner.TRUE:
 	case scanner.FALSE:
 	case scanner.NIL:
-	case scanner.LEFT_BRACE:
+	case scanner.LEFT_PAREN:
 		//check if next token is EOF , if not consume the LEFT_BRACE token and call expression
 		if current+1 >= len(tkn) {
 			return nil, fmt.Errorf("Expected an expression token but got EOF")
@@ -271,7 +273,7 @@ func (tkn Tokens) primary() (exp, error) {
 		if err != nil {
 			return nil, err
 		}
-		if tkn[current].Ttype != scanner.RIGHT_BRACE {
+		if tkn[current].Ttype != scanner.RIGHT_PAREN {
 			return nil, fmt.Errorf("Expected a RIGHT_BRACE token but got %d", tkn[current].Ttype)
 		}
 		return exp, nil
