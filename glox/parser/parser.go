@@ -82,12 +82,8 @@ func (tkn Tokens) tenary() (exp, error) {
 		if err != nil {
 			return nil, err
 		}
-		//create a tenary
-		tenaryOp := &scanner.Token{
-			Ttype: scanner.TENARY,
-		}
-		eexpleft = tenary{condition: eexpleft, operator: tenaryOp, then: expthen, elsef: expelse}
-		//continue
+
+		eexpleft = tenary{condition: eexpleft, operator: eToken, then: expthen, elsef: expelse}
 	}
 
 	return eexpleft, nil
@@ -120,7 +116,7 @@ func (tkn Tokens) multiple() (exp, error) {
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 func (tkn Tokens) expression() (exp, error) {
-	return tkn.equality()
+	return tkn.tenary()
 }
 
 func (tkn Tokens) equality() (exp, error) {
