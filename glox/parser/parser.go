@@ -51,10 +51,11 @@ func Parser(tkn Tokens) (exp, error) {
 	return exp, err
 }
 
-// TODO:tenary expression
-// TODO:nested tenary expression
-// TODO:precedence
-func (tkn Tokens) tenary() (exp, error) {
+/*
+ * // TODO:tenary expression
+ // TODO:nested tenary expression
+ // TODO:precedence
+ func (tkn Tokens) tenary() (exp, error) {
 	//may have a condition expression or not
 	eexpleft, err := tkn.equality()
 	if err != nil {
@@ -87,9 +88,12 @@ func (tkn Tokens) tenary() (exp, error) {
 	}
 
 	return eexpleft, nil
-}
+ }
+*/
 
-func (tkn Tokens) multiple() (exp, error) {
+/*
+ *
+ * func (tkn Tokens) multiple() (exp, error) {
 	texpleft, err := tkn.tenary()
 	if err != nil {
 		return nil, err
@@ -111,12 +115,13 @@ func (tkn Tokens) multiple() (exp, error) {
 		break
 	}
 	return texpleft, nil
-}
+ }
+*/
 
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 func (tkn Tokens) expression() (exp, error) {
-	return tkn.tenary()
+	return tkn.equality()
 }
 
 func (tkn Tokens) equality() (exp, error) {
