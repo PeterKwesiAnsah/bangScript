@@ -221,6 +221,7 @@ func (tkn Tokens) factor() (exp, error) {
 Matching_Loop:
 	for {
 		cToken := tkn[current]
+		//println(cToken.Ttype)
 		// find the operator terminal
 		for _, op := range opsToMatch {
 			if cToken.Ttype == op {
@@ -277,6 +278,7 @@ func (tkn Tokens) primary() (exp, error) {
 		if tkn[current].Ttype != scanner.RIGHT_PAREN {
 			return nil, fmt.Errorf("Expected a RIGHT_BRACE token but got %d", tkn[current].Ttype)
 		}
+		current++
 		return exp, nil
 	default:
 		//invalid expresion token
