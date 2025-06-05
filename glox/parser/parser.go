@@ -8,7 +8,7 @@ import (
 type Tokens []*scanner.Token
 
 type exp interface {
-	print()
+	evaluate()
 }
 
 type binary struct {
@@ -37,10 +37,11 @@ type primary struct {
 }
 
 // implement the exp interface
-func (exp binary) print()  {}
-func (exp unary) print()   {}
-func (exp primary) print() {}
-func (exp tenary) print()  {}
+func (exp binary) evaluate()  {}
+func (exp unary) evaluate()   {}
+func (exp primary) evaluate() {}
+
+//func (exp tenary) evaluate()  {}
 
 var current int = 0
 
