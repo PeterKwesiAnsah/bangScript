@@ -3,12 +3,14 @@ package parser
 import (
 	"fmt"
 	"lox/glox/scanner"
+	"strconv"
 )
 
 type Tokens []*scanner.Token
+type obj interface{}
 
 type exp interface {
-	evaluate()
+	evaluate() obj
 }
 
 type binary struct {
@@ -36,10 +38,64 @@ type primary struct {
 	node *scanner.Token
 }
 
+/**
+ * evaluating expressions also defines what the user can do and what types or operands can perform this operations
+ * binary arithemetic operations (+)(/)(*)(-)
+ * (+) has operator overloading
+ * (+) (string + string) string, (double + double) double (only)
+ * (/) (double / double) double (only)
+ * (-) (double - double) double (only)
+ * unary operations (!)(-)
+ * (!) (boolean) bool
+ * (-) (double) double
+ * binary logical operations (==)(!=)(>)(>=)(<)(<=)
+ * (==)(string | double | boolean) bool
+ * (!=)(string | double | boolean) bool
+ * (>)(>=)(<)(<=) (double  (>)(>=)(<)(<=) double ) bool
+ * TODO: add support for logical (&&) (||)
+ */
+
 // implement the exp interface
-func (exp binary) evaluate()  {}
-func (exp unary) evaluate()   {}
-func (exp primary) evaluate() {}
+func (p primary) evaluate() obj {
+	if p.node != nil {
+		//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
+		// operands needs to be only following string , number and boolean
+		switch p.node.Ttype {
+		case scanner.NUMBER:
+			op, err := strconv.ParseFloat(p.node.Lexem, 64)
+			if err == nil {
+				//handle error for failed type conversion
+				return nil
+			}
+			return op
+		//string concantenation and comparison
+		case scanner.STRING:
+			return p.node.Lexem
+		//boolean algebra
+		case scanner.TRUE:
+			return true
+		case scanner.FALSE:
+			return false
+		case scanner.NIL:
+		}
+	}
+	return nil
+}
+
+func (u unary) evaluate() obj {
+	exp := u.right.evaluate()
+	//switch case for !(boolean expression) and -(integer expresion)
+	if exp != nil && exp != float64(0) {
+		return true
+	}
+	return false
+}
+
+func (b binary) evaluate() obj {
+	//left := b.left.evaluate()
+	//right := b.right.evaluate()
+	return 1
+}
 
 //func (exp tenary) evaluate()  {}
 
