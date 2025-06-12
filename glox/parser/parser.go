@@ -10,7 +10,7 @@ type Tokens []*scanner.Token
 type obj interface{}
 
 type exp interface {
-	evaluate() obj
+	evaluate() (obj, error)
 }
 
 type binary struct {
@@ -56,30 +56,30 @@ type primary struct {
  */
 
 // implement the exp interface
-func (p primary) evaluate() obj {
-	if p.node != nil {
-		//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
-		// operands needs to be only following string , number and boolean
-		switch p.node.Ttype {
-		case scanner.NUMBER:
-			op, err := strconv.ParseFloat(p.node.Lexem, 64)
-			if err == nil {
-				//handle error for failed type conversion
-				return nil
-			}
-			return op
-		//string concantenation and comparison
-		case scanner.STRING:
-			return p.node.Lexem
-		//boolean algebra
-		case scanner.TRUE:
-			return true
-		case scanner.FALSE:
-			return false
-		case scanner.NIL:
+func (p primary) evaluate() (obj, error) {
+	//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
+	// operands needs to be only following string , number and boolean
+	switch p.node.Ttype {
+	case scanner.NUMBER:
+		op, err := strconv.ParseFloat(p.node.Lexem, 64)
+		if err != nil {
+			//handle error for failed type conversion
+			return nil, err
 		}
+		return op, nil
+	//string concantenation and comparison
+	case scanner.STRING:
+		return p.node.Lexem, nil
+	//boolean algebra
+	case scanner.TRUE:
+		return true, nil
+	case scanner.FALSE:
+		return false, nil
+	case scanner.NIL:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("Expected a string, number,nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
 	}
-	return nil
 }
 
 func (u unary) evaluate() obj {
@@ -91,10 +91,42 @@ func (u unary) evaluate() obj {
 	return false
 }
 
-func (b binary) evaluate() obj {
-	//left := b.left.evaluate()
-	//right := b.right.evaluate()
-	return 1
+func (b binary) evaluate() (obj, error) {
+	left, err := b.left.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	right, err := b.right.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	switch b.operator.Ttype {
+	case scanner.PLUS:
+		{
+			//string concantenation
+			strLeft, okLeft := left.(string)
+			if okLeft {
+				strRight, okRight := right.(string)
+				if !okRight {
+					return nil, fmt.Errorf("Invalid Right operand, expected a string at line %d", b.operator.Line)
+				}
+				return strLeft + strRight,nil
+
+		}
+		// interger addition
+		floatLeft, okLeft := left.(float64)
+		if okLeft {
+			floatRight, okRight := right.(float64)
+			if !okRight {
+				return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.operator.Line)
+			}
+			return floatLeft + floatRight,nil
+
+	}
+	return nil,fmt.Errorf("Invalid expression, expected string or number as operands")
+
+	}
+	return nil,nil
 }
 
 //func (exp tenary) evaluate()  {}
