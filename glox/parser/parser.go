@@ -27,8 +27,6 @@ type tenary struct {
 	elsef     exp
 }
 
-// TODO: handle multiple expression rule
-// TODO: handle tenary expression rule
 type unary struct {
 	operator *scanner.Token
 	right    exp
@@ -82,13 +80,27 @@ func (p primary) evaluate() (obj, error) {
 	}
 }
 
-func (u unary) evaluate() obj {
-	exp := u.right.evaluate()
-	//switch case for !(boolean expression) and -(integer expresion)
-	if exp != nil && exp != float64(0) {
-		return true
+func (u unary) evaluate() (obj, error) {
+	exp, err := u.right.evaluate()
+	if err != nil {
+		return nil, err
 	}
-	return false
+	operator := u.operator.Ttype
+
+	if operator == scanner.BANG {
+		bol, isbol := exp.(bool)
+		if isbol {
+			return !bol, nil
+		}
+		return nil, fmt.Errorf("Expected a boolean value but got something else at line %d", u.operator.Line)
+	} else if operator == scanner.MINUS {
+		num, isnum := exp.(float64)
+		if isnum {
+			return -num, nil
+		}
+		return nil, fmt.Errorf("Expected a number value but got something else at line %d", u.operator.Line)
+	}
+	return nil, fmt.Errorf("Invalid expression")
 }
 
 func (b binary) evaluate() (obj, error) {
@@ -103,30 +115,156 @@ func (b binary) evaluate() (obj, error) {
 	switch b.operator.Ttype {
 	case scanner.PLUS:
 		{
-			//string concantenation
+			//string concatenation
+			// TODO: (parse and concatenate) string + number | number + string
 			strLeft, okLeft := left.(string)
 			if okLeft {
 				strRight, okRight := right.(string)
 				if !okRight {
 					return nil, fmt.Errorf("Invalid Right operand, expected a string at line %d", b.operator.Line)
 				}
-				return strLeft + strRight,nil
-
-		}
-		// interger addition
-		floatLeft, okLeft := left.(float64)
-		if okLeft {
-			floatRight, okRight := right.(float64)
-			if !okRight {
-				return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.operator.Line)
+				return strLeft + strRight, nil
 			}
-			return floatLeft + floatRight,nil
+			// integer addition
+			floatLeft, okLeft := left.(float64)
+			if okLeft {
+				floatRight, okRight := right.(float64)
+				if !okRight {
+					return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.operator.Line)
+				}
+				return floatLeft + floatRight, nil
+			}
+		}
+	case scanner.SLASH:
+		{
+			//integer division
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft / nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.MINUS:
+		{
+			//integer division
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft - nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.GREATER:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft > nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.GREATER_EQUAL:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft >= nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.LESS:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft < nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.LESS_EQUAL:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft <= nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.EQUAL_EQUAL:
+		{
+			switch left.(type) {
+			case string:
+				{
+					//string comparison
+					str, isStr := right.(string)
+					if isStr {
+						return left == str, nil
+					}
+				}
+			case float64:
+				{
+					//integer equality check
+					num, isNum := right.(float64)
+					if isNum {
+						return left == num, nil
+					}
+				}
+			case bool:
+				{
+					//boolean arithemetic
+					bool, isBool := right.(bool)
+					if isBool {
+						return left == bool, nil
+					}
+				}
+			default:
+				// no match;
+				return nil, fmt.Errorf("Invalid expression.")
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.BANG_EQUAL:
+		{
+			switch left.(type) {
+			case string:
+				{
+					strRight, isStr := right.(string)
+					if isStr {
+						return left != strRight, nil
+					}
+				}
+			case float64:
+				{
+					numRight, isNum := right.(float64)
+					if isNum {
+						return left != numRight, nil
+					}
+				}
+			case bool:
+				{
+					boolRight, isBool := right.(bool)
+					if isBool {
+						return left != boolRight, nil
+					}
+				}
+			default:
+				// no match;
+				return nil, fmt.Errorf("Invalid expression.")
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	default:
+		{
+			return nil, fmt.Errorf("Invalid operator at line %d.", b.operator.Line)
+		}
 
 	}
-	return nil,fmt.Errorf("Invalid expression, expected string or number as operands")
-
-	}
-	return nil,nil
+	return nil, fmt.Errorf("Invalid expression.")
 }
 
 //func (exp tenary) evaluate()  {}
@@ -140,73 +278,8 @@ func Parser(tkn Tokens) (exp, error) {
 	return exp, err
 }
 
-/*
- * // TODO:tenary expression
- // TODO:nested tenary expression
- // TODO:precedence
- func (tkn Tokens) tenary() (exp, error) {
-	//may have a condition expression or not
-	eexpleft, err := tkn.equality()
-	if err != nil {
-		return nil, err
-	}
-
-	eToken := tkn[current]
-	// find the comma operator terminal
-	if eToken.Ttype == scanner.QUESTION {
-		//consume question (?)
-		current++
-		//then expression
-		//call from the top ?? call multiple to handle comma seperated operations
-		expthen, err := tkn.equality()
-		if err != nil {
-			return nil, err
-		}
-		if (tkn[current].Ttype) != scanner.COLON {
-			return nil, fmt.Errorf("Expected the COLON token but got %d", tkn[current].Ttype)
-		}
-		//consume colon (:)
-		current++
-		//handle else expression
-		expelse, err := tkn.equality()
-		if err != nil {
-			return nil, err
-		}
-
-		eexpleft = tenary{condition: eexpleft, operator: eToken, then: expthen, elsef: expelse}
-	}
-
-	return eexpleft, nil
- }
-*/
-
-/*
- *
- * func (tkn Tokens) multiple() (exp, error) {
-	texpleft, err := tkn.tenary()
-	if err != nil {
-		return nil, err
-	}
-	for {
-		tToken := tkn[current]
-		// find the comma operator terminal
-		if tToken.Ttype == scanner.COMMA {
-			op := tToken
-			//consume comma(,)
-			current++
-			texpright, err := tkn.tenary()
-			if err != nil {
-				return nil, err
-			}
-			texpleft = binary{left: texpleft, operator: op, right: texpright}
-			continue
-		}
-		break
-	}
-	return texpleft, nil
- }
-*/
-
+// TODO: grammer for tenary expressions
+// TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 func (tkn Tokens) expression() (exp, error) {
