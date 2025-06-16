@@ -9,27 +9,27 @@ import (
 type Tokens []*scanner.Token
 type obj interface{}
 
-type exp interface {
-	evaluate() (obj, error)
+type Exp interface {
+	Evaluate() (obj, error)
 }
 
 type binary struct {
-	left     exp
+	left     Exp
 	operator *scanner.Token
-	right    exp
+	right    Exp
 }
 
 // for handling conditional operations
 type tenary struct {
-	condition exp
+	condition Exp
 	operator  *scanner.Token
-	then      exp
-	elsef     exp
+	then      Exp
+	elsef     Exp
 }
 
 type unary struct {
 	operator *scanner.Token
-	right    exp
+	right    Exp
 }
 
 type primary struct {
@@ -53,8 +53,8 @@ type primary struct {
  * TODO: add support for logical (&&) (||)
  */
 
-// implement the exp interface
-func (p primary) evaluate() (obj, error) {
+// implement the Exp interface
+func (p primary) Evaluate() (obj, error) {
 	//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
 	// operands needs to be only following string , number and boolean
 	switch p.node.Ttype {
@@ -80,21 +80,21 @@ func (p primary) evaluate() (obj, error) {
 	}
 }
 
-func (u unary) evaluate() (obj, error) {
-	exp, err := u.right.evaluate()
+func (u unary) Evaluate() (obj, error) {
+	Exp, err := u.right.Evaluate()
 	if err != nil {
 		return nil, err
 	}
 	operator := u.operator.Ttype
 
 	if operator == scanner.BANG {
-		bol, isbol := exp.(bool)
+		bol, isbol := Exp.(bool)
 		if isbol {
 			return !bol, nil
 		}
 		return nil, fmt.Errorf("Expected a boolean value but got something else at line %d", u.operator.Line)
 	} else if operator == scanner.MINUS {
-		num, isnum := exp.(float64)
+		num, isnum := Exp.(float64)
 		if isnum {
 			return -num, nil
 		}
@@ -103,12 +103,12 @@ func (u unary) evaluate() (obj, error) {
 	return nil, fmt.Errorf("Invalid expression")
 }
 
-func (b binary) evaluate() (obj, error) {
-	left, err := b.left.evaluate()
+func (b binary) Evaluate() (obj, error) {
+	left, err := b.left.Evaluate()
 	if err != nil {
 		return nil, err
 	}
-	right, err := b.right.evaluate()
+	right, err := b.right.Evaluate()
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +152,16 @@ func (b binary) evaluate() (obj, error) {
 			nRight, okRight := right.(float64)
 			if okLeft && okRight {
 				return (nLeft - nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.STAR:
+		{
+			//integer division
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft * nRight), nil
 			}
 			return nil, fmt.Errorf("Invalid expression.")
 		}
@@ -267,26 +277,26 @@ func (b binary) evaluate() (obj, error) {
 	return nil, fmt.Errorf("Invalid expression.")
 }
 
-//func (exp tenary) evaluate()  {}
+//func (Exp tenary) Evaluate()  {}
 
 var current int = 0
 
-func Parser(tkn Tokens) (exp, error) {
-	exp, err := tkn.expression()
+func Parser(tkn Tokens) (Exp, error) {
+	Exp, err := tkn.expression()
 	//For testing cases, we need to reset the current counter
 	current = 0
-	return exp, err
+	return Exp, err
 }
 
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
-func (tkn Tokens) expression() (exp, error) {
+func (tkn Tokens) expression() (Exp, error) {
 	return tkn.equality()
 }
 
-func (tkn Tokens) equality() (exp, error) {
+func (tkn Tokens) equality() (Exp, error) {
 	cexpleft, err := tkn.comparison()
 	if err != nil {
 		return nil, err
@@ -308,7 +318,7 @@ func (tkn Tokens) equality() (exp, error) {
 	}
 	return cexpleft, nil
 }
-func (tkn Tokens) comparison() (exp, error) {
+func (tkn Tokens) comparison() (Exp, error) {
 	texpleft, err := tkn.term()
 	opsToMatch := []scanner.Tokentype{
 		scanner.GREATER,
@@ -340,7 +350,7 @@ Matching_Loop:
 	}
 	return texpleft, nil
 }
-func (tkn Tokens) term() (exp, error) {
+func (tkn Tokens) term() (Exp, error) {
 	fexpleft, err := tkn.factor()
 	opsToMatch := []scanner.Tokentype{
 		scanner.PLUS,
@@ -371,7 +381,7 @@ Matching_Loop:
 	return fexpleft, nil
 }
 
-func (tkn Tokens) factor() (exp, error) {
+func (tkn Tokens) factor() (Exp, error) {
 	uexpleft, err := tkn.unary()
 	opsToMatch := []scanner.Tokentype{
 		scanner.STAR,
@@ -403,7 +413,7 @@ Matching_Loop:
 	}
 	return uexpleft, nil
 }
-func (tkn Tokens) unary() (exp, error) {
+func (tkn Tokens) unary() (Exp, error) {
 	uToken := tkn[current]
 	if uToken.Ttype == scanner.BANG || uToken.Ttype == scanner.MINUS {
 		op := uToken
@@ -417,7 +427,7 @@ func (tkn Tokens) unary() (exp, error) {
 	}
 	return tkn.primary()
 }
-func (tkn Tokens) primary() (exp, error) {
+func (tkn Tokens) primary() (Exp, error) {
 	ttype := tkn[current].Ttype
 	tnode := primary{}
 	switch ttype {
@@ -433,7 +443,7 @@ func (tkn Tokens) primary() (exp, error) {
 			return nil, fmt.Errorf("Expected an expression token but got EOF")
 		}
 		current++
-		exp, err := tkn.expression()
+		Exp, err := tkn.expression()
 		if err != nil {
 			return nil, err
 		}
@@ -441,7 +451,7 @@ func (tkn Tokens) primary() (exp, error) {
 			return nil, fmt.Errorf("Expected a RIGHT_BRACE token but got %d", tkn[current].Ttype)
 		}
 		current++
-		return exp, nil
+		return Exp, nil
 	default:
 		//invalid expresion token
 		return nil, fmt.Errorf("Expected an expression token but got %d", tkn[current].Ttype)
