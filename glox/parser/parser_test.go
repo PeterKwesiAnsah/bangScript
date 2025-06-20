@@ -353,7 +353,7 @@ func TestParenthesizeExpression(t *testing.T) {
 	tests := []struct {
 		name     string
 		tokens   Tokens
-		expected exp
+		expected Exp
 	}{
 		{
 			name:     "Simple grouping",
@@ -409,7 +409,7 @@ func TestOperatorPrecedence(t *testing.T) {
 	tests := []struct {
 		name        string
 		tokens      Tokens
-		expected    exp
+		expected    Exp
 		description string
 	}{
 		{
@@ -504,3 +504,5 @@ func TestOperatorPrecedence(t *testing.T) {
 		})
 	}
 }
+
+//evaluating parsed expressions

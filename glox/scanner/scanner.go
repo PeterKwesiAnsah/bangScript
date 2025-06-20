@@ -92,7 +92,7 @@ func addToken(tokens []*Token, line int, lexem string, ttype Tokentype) []*Token
 	return append(tokens, &token)
 }
 
-func peekNext(source string, current int) (byte, bool) {
+func peekNext(source []byte, current int) (byte, bool) {
 	isEOF := current+1 >= len(source)
 	if isEOF {
 		//null character
@@ -100,7 +100,7 @@ func peekNext(source string, current int) (byte, bool) {
 	}
 	return source[current+1], false
 }
-func peek(source string, current int) (byte, bool) {
+func peek(source []byte, current int) (byte, bool) {
 	isEOF := current >= len(source)
 	if isEOF {
 		//null character
@@ -109,7 +109,7 @@ func peek(source string, current int) (byte, bool) {
 	return source[current], false
 }
 
-func ScanTokens(source string) ([]*Token, error) {
+func ScanTokens(source []byte) ([]*Token, error) {
 	tokens := make([]*Token, 0, 5)
 
 	sp := sprop{line: 1}

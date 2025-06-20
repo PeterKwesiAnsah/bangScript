@@ -13,6 +13,17 @@ type Exp interface {
 	Evaluate() (obj, error)
 }
 
+// statements are now into two Declaration Statements (are statements like varDeclartion,function,classes. These statements usually cant be used directly after constructs like if and while) and Regular Statements
+// program->declarations*EOF
+// declarations->varDeclar | statements
+// varDeclar->"var" IDENTIFIER (=expression)?";"
+// statements->printStmt | expressionStmt
+// printStmt->"print" expression ";"
+// expressionStmt->expression;
+type Stmt interface {
+	Execute() error
+}
+
 type binary struct {
 	left     Exp
 	operator *scanner.Token
@@ -75,6 +86,7 @@ func (p primary) Evaluate() (obj, error) {
 		return false, nil
 	case scanner.NIL:
 		return nil, nil
+	//TODO: case scanner.IDENTIFIER (variable expression)
 	default:
 		return nil, fmt.Errorf("Expected a string, number,nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
 	}
@@ -292,6 +304,7 @@ func Parser(tkn Tokens) (Exp, error) {
 // TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
+// Rule for parsing expressions into trees
 func (tkn Tokens) expression() (Exp, error) {
 	return tkn.equality()
 }
@@ -459,4 +472,15 @@ func (tkn Tokens) primary() (Exp, error) {
 	tnode.node = tkn[current]
 	current++
 	return tnode, nil
+}
+
+type VDT struct {
+	//we expect scanner.Token to be an identifier
+	name scanner.Token
+	exp  Exp
+}
+
+// Rule for parsing variable declaration statements into trees
+func (tkn Tokens) VarDeclaration() (VDT, error) {
+
 }

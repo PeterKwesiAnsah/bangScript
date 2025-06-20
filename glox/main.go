@@ -5,6 +5,8 @@ package main
 
 import (
 	"fmt"
+	"lox/glox/parser"
+	"lox/glox/scanner"
 	"os"
 )
 
@@ -15,21 +17,27 @@ func main() {
 		os.Exit(1)
 	} else if len(args) == 2 {
 		path := args[1]
-		fp, err := os.Open(path)
+		source, err := os.ReadFile(path)
 		if err != nil {
-			fmt.Errorf("Failed to open file :%w\n", err)
+			fmt.Printf("Failed to open file :%s\n", err.Error())
 			os.Exit(1)
 		}
-		fmt.Printf("buffer size %d, buffer as array size %d\n", len(buf), len(string(buf)))
-		return
-		tokens, err := scanner.ScanTokens(string(buf))
+		tokens, err := scanner.ScanTokens(source)
 		if err != nil {
-			fmt.Errorf("%w\n", err)
+			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
 		}
-		sizeofFile := fileStat.Size()
-		buf := make([]byte, sizeofFile)
-
+		t, err := parser.Parser(tokens)
+		if err != nil {
+			fmt.Printf("%s\n", err.Error())
+			os.Exit(1)
+		}
+		res, err := t.Evaluate()
+		if err != nil {
+			fmt.Printf("%s\n", err.Error())
+			os.Exit(1)
+		}
+		fmt.Printf("%v\n", res)
 	} else {
 		fmt.Print("Run: REPL\n")
 	}

@@ -7,7 +7,7 @@ import (
 // TestEmptySource ensures the scanner returns only EOF token for empty source
 func TestEmptySource(t *testing.T) {
 	source := ""
-	tokens, _ := ScanTokens(source)
+	tokens, _ := ScanTokens([]byte(source))
 
 	if len(tokens) != 1 {
 		t.Fatalf("Expected 1 token (EOF), got %d", len(tokens))
@@ -21,7 +21,7 @@ func TestEmptySource(t *testing.T) {
 // TestSingleCharacterTokens tests recognition of all single-character tokens
 func TestSingleCharacterTokens(t *testing.T) {
 	source := "(){},.-+;*/"
-	tokens, err := ScanTokens(source)
+	tokens, err := ScanTokens([]byte(source))
 
 	if err != nil {
 		t.Fatalf("Did not expect any errors but, got %s", err.Error())
@@ -64,7 +64,7 @@ func TestOneOrTwoCharacterTokens(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.source, func(t *testing.T) {
 
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d (%d-%d-%d)", len(tc.expected), len(tokens), tokens[0].Ttype, tokens[1].Ttype, tokens[2].Ttype)
@@ -106,7 +106,7 @@ func TestLineComments(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			//scanner := ScanTokens(tc.source)
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d", len(tc.expected), len(tokens))
@@ -177,7 +177,7 @@ func TestBlockComments(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d", len(tc.expected), len(tokens))
@@ -218,7 +218,7 @@ func TestNestedBlockComments(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d", len(tc.expected), len(tokens))
@@ -259,7 +259,7 @@ func TestIncompleteBlockComments(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ScanTokens(tc.source)
+			_, err := ScanTokens([]byte(tc.source))
 
 			hasErrors := err != nil
 			if tc.expectErr != hasErrors {
@@ -277,7 +277,7 @@ func TestIncompleteBlockComments(t *testing.T) {
 func TestWhitespace(t *testing.T) {
 	source := " \r\n\t42  \n  53"
 
-	tokens, _ := ScanTokens(source)
+	tokens, _ := ScanTokens([]byte(source))
 
 	expectedTypes := []Tokentype{NUMBER, NUMBER, EOF}
 	expectedLexemes := []string{"42", "53", ""}
@@ -327,7 +327,7 @@ func TestStrings(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d", len(tc.expected), len(tokens))
@@ -381,7 +381,7 @@ func TestNumbers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d", len(tc.expected), len(tokens))
@@ -447,7 +447,7 @@ func TestIdentifiers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, _ := ScanTokens(tc.source)
+			tokens, _ := ScanTokens([]byte(tc.source))
 
 			if len(tokens) != len(tc.expected) {
 				t.Fatalf("Expected %d tokens, got %d", len(tc.expected), len(tokens))
@@ -490,7 +490,7 @@ class Test {
 /* Block comment before var declaration */ var test = Test();
 print test.getValue(); /* Should print 42 */
 `
-	tokens, _ := ScanTokens(source)
+	tokens, _ := ScanTokens([]byte(source))
 
 	expectedTypes := []Tokentype{
 		CLASS, IDENTIFIER, LEFT_BRACE,
@@ -551,7 +551,7 @@ var counter = Counter();
 print "Count: " + counter.increment(); /* Should print "Count: 1" */
 `
 
-	tokens, err := ScanTokens(source)
+	tokens, err := ScanTokens([]byte(source))
 
 	// We won't test each individual token, but verify that the scanner
 	// produces a reasonable number of tokens and no errors
@@ -578,7 +578,7 @@ line 2
    spanning
    multiple lines */
 line 6`
-	tokens, _ := ScanTokens(source)
+	tokens, _ := ScanTokens([]byte(source))
 
 	// Should have 6 tokens: "line" "1" "line" "2" "line" "6" EOF
 	expectedLines := []int{1, 1, 2, 2, 6, 6, 6}
@@ -598,7 +598,7 @@ line 6`
 func TestMultilineString(t *testing.T) {
 	source := "\"This is a\nmultiline\nstring\""
 	//scanner := ScanTokens(source)
-	tokens, _ := ScanTokens(source)
+	tokens, _ := ScanTokens([]byte(source))
 
 	if len(tokens) != 2 { // STRING + EOF
 		t.Fatalf("Expected 2 tokens, got %d", len(tokens))
@@ -623,7 +623,7 @@ line 3
    Block comment line 6 */
 line 7`
 
-	tokens, _ := ScanTokens(source)
+	tokens, _ := ScanTokens([]byte(source))
 
 	// Should have 6 tokens: "line" "1" "line" "3" "line" "7" EOF
 	expectedLines := []int{1, 1, 3, 3, 7, 7, 7}
