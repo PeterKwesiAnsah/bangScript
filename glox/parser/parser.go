@@ -13,15 +13,20 @@ type Exp interface {
 	Evaluate() (obj, error)
 }
 
-// statements are now into two Declaration Statements (are statements like varDeclartion,function,classes. These statements usually cant be used directly after constructs like if and while) and Regular Statements
-// program->declarations*EOF
-// declarations->varDeclar | statements
-// varDeclar->"var" IDENTIFIER (=expression)?";"
-// statements->printStmt | expressionStmt
-// printStmt->"print" expression ";"
-// expressionStmt->expression;
 type Stmt interface {
 	Execute() error
+}
+
+type Stmtsenv struct {
+	//Starting from global/file environments
+	local map[string]obj
+	//enclosed will be nil
+	enclosed *Stmtsenv
+}
+
+type Stmts struct {
+	stmts []Stmt
+	env   Stmtsenv
 }
 
 type binary struct {
@@ -47,6 +52,82 @@ type primary struct {
 	node *scanner.Token
 }
 
+type varStmt struct {
+	//we expect scanner.Token to be an identifier
+	name scanner.Token
+	exp  Exp
+}
+type printStmt struct {
+	exp Exp
+}
+
+var current int = 0
+
+func (t printStmt) Execute() error {
+	return nil
+}
+func (tkn Tokens) printStmt() (Stmt, error) {
+	stmt := varStmt{}
+	return stmt, nil
+}
+
+func (t varStmt) Execute() error {
+	return nil
+}
+func (tkn Tokens) varstatement() (Stmt, error) {
+	stmt := varStmt{}
+	return stmt, nil
+}
+func (tkn Tokens) statement() (Stmt, error) {
+	var i Stmt
+	curT := tkn[current]
+	if curT.Ttype == scanner.VAR {
+		current++
+		return tkn.varstatement()
+	}
+	return i, nil
+}
+
+// Starting from global/file environments
+// that's what the statments share or have in common
+func declarations(tkn Tokens) (*Stmts, error) {
+	//statements grouped by environment or context
+	prg := Stmts{}
+	//without context or environment
+	list := []Stmt{}
+	for current < len(tkn) {
+		stmt, err := tkn.statement()
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, stmt)
+	}
+	prg.stmts = list
+	return &prg, nil
+}
+func Parser(tkn Tokens) (Exp, error) {
+	Exp, err := tkn.expression()
+	//For testing cases, we need to reset the current counter
+	current = 0
+	return Exp, err
+}
+
+// statements are now into two Declaration Statements (are statements like varDeclartion,function,classes. These statements usually cant be used directly after constructs like if and while) and Regular Statements
+// program->declarations*EOF
+// declarations->varDeclar | statements
+// varDeclar->"var" IDENTIFIER (=expression)?";"
+// statements->printStmt | block | expressionStmt
+// block->"{" declarations* "}"
+// printStmt->"print" expression ";"
+// expressionStmt->expression;
+// expression->assignment
+// assigment->equality ("=" assignment)*
+
+////statement rules and their interface implementaion
+
+// end
+
+///////////////////////expression rules and their interface implementation
 /**
  * evaluating expressions also defines what the user can do and what types or operands can perform this operations
  * binary arithemetic operations (+)(/)(*)(-)
@@ -289,17 +370,6 @@ func (b binary) Evaluate() (obj, error) {
 	return nil, fmt.Errorf("Invalid expression.")
 }
 
-//func (Exp tenary) Evaluate()  {}
-
-var current int = 0
-
-func Parser(tkn Tokens) (Exp, error) {
-	Exp, err := tkn.expression()
-	//For testing cases, we need to reset the current counter
-	current = 0
-	return Exp, err
-}
-
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
@@ -474,13 +544,4 @@ func (tkn Tokens) primary() (Exp, error) {
 	return tnode, nil
 }
 
-type VDT struct {
-	//we expect scanner.Token to be an identifier
-	name scanner.Token
-	exp  Exp
-}
-
-// Rule for parsing variable declaration statements into trees
-func (tkn Tokens) VarDeclaration() (VDT, error) {
-
-}
+/////////////////////////////////////////////////////end of expression rules
