@@ -11,7 +11,7 @@ type obj interface{}
 
 type Exp interface {
 	//should take in an environment or context
-	Evaluate() (obj, error)
+	Evaluate(env *Stmtsenv) (obj, error)
 }
 
 type Stmt interface {
@@ -230,7 +230,7 @@ func Parser(tkn Tokens) (Exp, error) {
  */
 
 // implement the Exp interface
-func (p primary) Evaluate() (obj, error) {
+func (p primary) Evaluate(env *Stmtsenv) (obj, error) {
 	//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
 	// operands needs to be only following string , number and boolean
 	switch p.node.Ttype {
@@ -251,14 +251,25 @@ func (p primary) Evaluate() (obj, error) {
 		return false, nil
 	case scanner.NIL:
 		return nil, nil
-	//TODO: case scanner.IDENTIFIER (variable expression),read from env
+	case scanner.IDENTIFIER:
+		{
+			cur := env
+			for cur != nil {
+				obj, itExist := cur.local[p.node.Lexem]
+				if itExist {
+					return obj, nil
+				}
+				cur = cur.encloser
+			}
+			return nil, fmt.Errorf("Undefined varible at line %d", p.node.Line)
+		}
 	default:
-		return nil, fmt.Errorf("Expected a string, number,nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
+		return nil, fmt.Errorf("Expected a string, number, a target location , nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
 	}
 }
 
-func (u unary) Evaluate() (obj, error) {
-	Exp, err := u.right.Evaluate()
+func (u unary) Evaluate(env *Stmtsenv) (obj, error) {
+	Exp, err := u.right.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
@@ -280,12 +291,12 @@ func (u unary) Evaluate() (obj, error) {
 	return nil, fmt.Errorf("Invalid expression")
 }
 
-func (b binary) Evaluate() (obj, error) {
-	left, err := b.left.Evaluate()
+func (b binary) Evaluate(env *Stmtsenv) (obj, error) {
+	left, err := b.left.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
-	right, err := b.right.Evaluate()
+	right, err := b.right.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +465,7 @@ func (b binary) Evaluate() (obj, error) {
 	return nil, fmt.Errorf("Invalid expression.")
 }
 
-func (a assigment) Evaluate() (obj, error) {
+func (a assigment) Evaluate(env *Stmtsenv) (obj, error) {
 	return nil, nil
 }
 

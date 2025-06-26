@@ -32,7 +32,7 @@ func main() {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
 		}
-		res, err := t.Evaluate()
+		res, err := t.Evaluate(nil)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
