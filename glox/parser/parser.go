@@ -97,6 +97,15 @@ func (t printStmt) Execute() error {
 }
 func (tkn Tokens) printStmt() (Stmt, error) {
 	stmt := printStmt{}
+	exp, err := tkn.expression()
+	if err != nil {
+		return nil, err
+	}
+	stmt.exp = exp
+	//expect a ";" terminator
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+	}
 	return stmt, nil
 }
 
@@ -135,6 +144,15 @@ func (t expStmt) Execute() error {
 }
 func (tkn Tokens) expStmt() (Stmt, error) {
 	stmt := expStmt{}
+	exp, err := tkn.expression()
+	if err != nil {
+		return nil, err
+	}
+	stmt.exp = exp
+	//expect a ";" terminator
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+	}
 	return stmt, nil
 }
 
