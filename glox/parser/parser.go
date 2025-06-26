@@ -53,7 +53,7 @@ type blockStmt struct {
 
 type varStmt struct {
 	//we expect scanner.Token to be an identifier
-	name scanner.Token
+	name *scanner.Token
 	exp  Exp
 }
 type printStmt struct {
@@ -105,6 +105,28 @@ func (t varStmt) Execute() error {
 }
 func (tkn Tokens) varStmt() (Stmt, error) {
 	stmt := varStmt{}
+	//expect identifier
+	if tkn[current].Ttype != scanner.IDENTIFIER {
+		return nil, fmt.Errorf("Expected an identifier after var but got %d", tkn[current].Ttype)
+	}
+	stmt.name = tkn[current]
+	stmt.exp = nil
+	//consume identifier
+	current++
+	//optionally expect an initializer
+	if tkn[current].Ttype == scanner.EQUAL {
+		//we expect an initializer expresion or what some may call a variable expression
+		exp, err := tkn.expression()
+		if err != nil {
+			return nil, err
+		}
+		stmt.exp = exp
+	}
+	//expect a ";" terminator
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+	}
+
 	return stmt, nil
 }
 
