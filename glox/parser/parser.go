@@ -23,6 +23,14 @@ type Stmtsenv struct {
 	encloser *Stmtsenv
 }
 
+type assigment struct {
+	//l-value
+	storeTarget Exp
+	operator    *scanner.Token
+	//r-value
+	right Exp
+}
+
 type binary struct {
 	left     Exp
 	operator *scanner.Token
@@ -243,7 +251,7 @@ func (p primary) Evaluate() (obj, error) {
 		return false, nil
 	case scanner.NIL:
 		return nil, nil
-	//TODO: case scanner.IDENTIFIER (variable expression)
+	//TODO: case scanner.IDENTIFIER (variable expression),read from env
 	default:
 		return nil, fmt.Errorf("Expected a string, number,nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
 	}
@@ -446,13 +454,44 @@ func (b binary) Evaluate() (obj, error) {
 	return nil, fmt.Errorf("Invalid expression.")
 }
 
+func (a assigment) Evaluate() (obj, error) {
+	return nil, nil
+}
+
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 // Rule for parsing expressions into trees
 func (tkn Tokens) expression() (Exp, error) {
-	return tkn.equality()
+	return tkn.asignment()
+}
+func (tkn Tokens) asignment() (Exp, error) {
+	exp, err := tkn.equality()
+	if err != nil {
+		return nil, err
+	}
+	//optionally expect "="
+	if tkn[current].Ttype == scanner.EQUAL {
+		//assigment
+		op := tkn[current]
+		//currently lv are single nodes, obviosuly identifiers
+		lv, isStorageTarget := exp.(primary)
+		if isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER {
+			//consume "="
+			current++
+			//lv is a storage target
+			rv, err := tkn.asignment()
+			if err != nil {
+				return nil, err
+			}
+			ass := assigment{lv, op, rv}
+			return ass, nil
+		}
+		//if i had a print method to my exp interface , i could have called it here cool right. Maybe add this later
+		return nil, fmt.Errorf("Cannot use the l-value as storage target ")
+	}
+	return exp, nil
 }
 
 func (tkn Tokens) equality() (Exp, error) {
