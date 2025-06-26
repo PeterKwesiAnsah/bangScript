@@ -10,6 +10,7 @@ type Tokens []*scanner.Token
 type obj interface{}
 
 type Exp interface {
+	//should take in an environment or context
 	Evaluate() (obj, error)
 }
 
@@ -18,15 +19,8 @@ type Stmt interface {
 }
 
 type Stmtsenv struct {
-	//Starting from global/file environments
-	local map[string]obj
-	//enclosed will be nil
-	enclosed *Stmtsenv
-}
-
-type Stmts struct {
-	stmts []Stmt
-	env   Stmtsenv
+	local    map[string]obj
+	encloser *Stmtsenv
 }
 
 type binary struct {
@@ -52,6 +46,11 @@ type primary struct {
 	node *scanner.Token
 }
 
+type blockStmt struct {
+	stmts []Stmt
+	env   Stmtsenv
+}
+
 type varStmt struct {
 	//we expect scanner.Token to be an identifier
 	name scanner.Token
@@ -61,49 +60,86 @@ type printStmt struct {
 	exp Exp
 }
 
+type expStmt struct {
+	exp Exp
+}
+
 var current int = 0
+
+func (t blockStmt) Execute() error {
+	return nil
+}
+
+// in here, declaration will be caused by env,
+func (tkn Tokens) blockStmt(encloser *Stmtsenv) (Stmt, error) {
+	inner := Stmtsenv{}
+	stmts := []Stmt{}
+	stmt := blockStmt{}
+	for tkn[current].Ttype != scanner.RIGHT_BRACE && current < len(tkn) {
+		stmt, err := tkn.declarations(&inner)
+		if err != nil {
+			return nil, err
+		}
+		stmts = append(stmts, stmt)
+		current++
+	}
+	if tkn[current].Ttype != scanner.RIGHT_BRACE {
+		return nil, fmt.Errorf("Expected a right brace but got EOF")
+	}
+	stmt.stmts = stmts
+	inner.encloser = encloser
+	stmt.env = inner
+	return stmt, nil
+}
 
 func (t printStmt) Execute() error {
 	return nil
 }
 func (tkn Tokens) printStmt() (Stmt, error) {
-	stmt := varStmt{}
+	stmt := printStmt{}
 	return stmt, nil
 }
 
 func (t varStmt) Execute() error {
 	return nil
 }
-func (tkn Tokens) varstatement() (Stmt, error) {
+func (tkn Tokens) varStmt() (Stmt, error) {
 	stmt := varStmt{}
 	return stmt, nil
 }
-func (tkn Tokens) statement() (Stmt, error) {
-	var i Stmt
+
+func (t expStmt) Execute() error {
+	return nil
+}
+func (tkn Tokens) expStmt() (Stmt, error) {
+	stmt := expStmt{}
+	return stmt, nil
+}
+
+func (tkn Tokens) declarations(encloser *Stmtsenv) (Stmt, error) {
 	curT := tkn[current]
 	if curT.Ttype == scanner.VAR {
 		current++
-		return tkn.varstatement()
-	}
-	return i, nil
-}
-
-// Starting from global/file environments
-// that's what the statments share or have in common
-func declarations(tkn Tokens) (*Stmts, error) {
-	//statements grouped by environment or context
-	prg := Stmts{}
-	//without context or environment
-	list := []Stmt{}
-	for current < len(tkn) {
-		stmt, err := tkn.statement()
+		stmt, err := tkn.varStmt()
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, stmt)
+		return stmt, nil
+		//encloser.stmts = append(encloser.stmts, stmt)
+	} else if curT.Ttype == scanner.PRINT {
+		current++
+		stmt, err := tkn.printStmt()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	} else if curT.Ttype == scanner.LEFT_BRACE {
+		current++
+		//block statement Only type of statement with multiple statements bounded by an env, all other statements take their context
+		return tkn.blockStmt(encloser)
 	}
-	prg.stmts = list
-	return &prg, nil
+	//expression statement
+	return tkn.expStmt()
 }
 func Parser(tkn Tokens) (Exp, error) {
 	Exp, err := tkn.expression()
