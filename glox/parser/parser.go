@@ -7,20 +7,20 @@ import (
 )
 
 type Tokens []*scanner.Token
-type obj interface{}
+type Obj interface{}
 
 type Exp interface {
 	//should take in an environment or context
-	Evaluate(env *Stmtsenv) (obj, error)
+	Evaluate(env *Stmtsenv) (Obj, error)
 }
 
 type Stmt interface {
-	Execute() error
+	Execute(env *Stmtsenv) error
 }
 
 type Stmtsenv struct {
-	local    map[string]obj
-	encloser *Stmtsenv
+	Local    map[string]Obj
+	Encloser *Stmtsenv
 }
 
 type assigment struct {
@@ -74,33 +74,45 @@ type expStmt struct {
 
 var current int = 0
 
-func (t blockStmt) Execute() error {
+func (t blockStmt) Execute(env *Stmtsenv) error {
+	for _, stmt := range t.stmts {
+		err := stmt.Execute(&t.env)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// in here, declaration will be caused by env,
-func (tkn Tokens) blockStmt(encloser *Stmtsenv) (Stmt, error) {
-	inner := Stmtsenv{}
+// first blockStmt in call stack , will be called with the global env and subsequent ones will be wrapped recursively in a linked list
+func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
+	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 	stmts := []Stmt{}
 	stmt := blockStmt{}
-	for tkn[current].Ttype != scanner.RIGHT_BRACE && current < len(tkn) {
+	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
 		stmt, err := tkn.declarations(&inner)
 		if err != nil {
 			return nil, err
 		}
 		stmts = append(stmts, stmt)
-		current++
+		//current++
 	}
 	if tkn[current].Ttype != scanner.RIGHT_BRACE {
 		return nil, fmt.Errorf("Expected a right brace but got EOF")
 	}
+	current++
 	stmt.stmts = stmts
-	inner.encloser = encloser
+	inner.Encloser = Encloser
 	stmt.env = inner
 	return stmt, nil
 }
 
-func (t printStmt) Execute() error {
+func (t printStmt) Execute(env *Stmtsenv) error {
+	Obj, err := t.exp.Evaluate(env)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%v\n", Obj)
 	return nil
 }
 func (tkn Tokens) printStmt() (Stmt, error) {
@@ -114,10 +126,16 @@ func (tkn Tokens) printStmt() (Stmt, error) {
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
 	}
+	current++
 	return stmt, nil
 }
 
-func (t varStmt) Execute() error {
+func (t varStmt) Execute(env *Stmtsenv) error {
+	Obj, err := t.exp.Evaluate(env)
+	if err != nil {
+		return err
+	}
+	env.Local[t.name.Lexem] = Obj
 	return nil
 }
 func (tkn Tokens) varStmt() (Stmt, error) {
@@ -128,10 +146,12 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 	}
 	stmt.name = tkn[current]
 	stmt.exp = nil
+
 	//consume identifier
 	current++
 	//optionally expect an initializer
 	if tkn[current].Ttype == scanner.EQUAL {
+		current++
 		//we expect an initializer expresion or what some may call a variable expression
 		exp, err := tkn.expression()
 		if err != nil {
@@ -143,12 +163,13 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
 	}
-
+	current++
 	return stmt, nil
 }
 
-func (t expStmt) Execute() error {
-	return nil
+func (t expStmt) Execute(env *Stmtsenv) error {
+	_, err := t.exp.Evaluate(env)
+	return err
 }
 func (tkn Tokens) expStmt() (Stmt, error) {
 	stmt := expStmt{}
@@ -164,7 +185,7 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 	return stmt, nil
 }
 
-func (tkn Tokens) declarations(encloser *Stmtsenv) (Stmt, error) {
+func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	curT := tkn[current]
 	if curT.Ttype == scanner.VAR {
 		current++
@@ -173,7 +194,7 @@ func (tkn Tokens) declarations(encloser *Stmtsenv) (Stmt, error) {
 			return nil, err
 		}
 		return stmt, nil
-		//encloser.stmts = append(encloser.stmts, stmt)
+		//Encloser.stmts = append(Encloser.stmts, stmt)
 	} else if curT.Ttype == scanner.PRINT {
 		current++
 		stmt, err := tkn.printStmt()
@@ -184,16 +205,21 @@ func (tkn Tokens) declarations(encloser *Stmtsenv) (Stmt, error) {
 	} else if curT.Ttype == scanner.LEFT_BRACE {
 		current++
 		//block statement Only type of statement with multiple statements bounded by an env, all other statements take their context
-		return tkn.blockStmt(encloser)
+		return tkn.blockStmt(Encloser)
 	}
 	//expression statement
 	return tkn.expStmt()
 }
-func Parser(tkn Tokens) (Exp, error) {
-	Exp, err := tkn.expression()
-	//For testing cases, we need to reset the current counter
-	current = 0
-	return Exp, err
+func Parser(tkn Tokens, globalEnv *Stmtsenv) ([]Stmt, error) {
+	stmts := []Stmt{}
+	for tkn[current].Ttype != scanner.EOF {
+		stmt, err := tkn.declarations(globalEnv)
+		if err != nil {
+			return nil, err
+		}
+		stmts = append(stmts, stmt)
+	}
+	return stmts, nil
 }
 
 // statements are now into two Declaration Statements (are statements like varDeclartion,function,classes. These statements usually cant be used directly after constructs like if and while) and Regular Statements
@@ -230,7 +256,7 @@ func Parser(tkn Tokens) (Exp, error) {
  */
 
 // implement the Exp interface
-func (p primary) Evaluate(env *Stmtsenv) (obj, error) {
+func (p primary) Evaluate(env *Stmtsenv) (Obj, error) {
 	//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
 	// operands needs to be only following string , number and boolean
 	switch p.node.Ttype {
@@ -255,11 +281,11 @@ func (p primary) Evaluate(env *Stmtsenv) (obj, error) {
 		{
 			cur := env
 			for cur != nil {
-				obj, itExist := cur.local[p.node.Lexem]
+				Obj, itExist := cur.Local[p.node.Lexem]
 				if itExist {
-					return obj, nil
+					return Obj, nil
 				}
-				cur = cur.encloser
+				cur = cur.Encloser
 			}
 			return nil, fmt.Errorf("Undefined varible at line %d", p.node.Line)
 		}
@@ -268,7 +294,7 @@ func (p primary) Evaluate(env *Stmtsenv) (obj, error) {
 	}
 }
 
-func (u unary) Evaluate(env *Stmtsenv) (obj, error) {
+func (u unary) Evaluate(env *Stmtsenv) (Obj, error) {
 	Exp, err := u.right.Evaluate(env)
 	if err != nil {
 		return nil, err
@@ -291,7 +317,7 @@ func (u unary) Evaluate(env *Stmtsenv) (obj, error) {
 	return nil, fmt.Errorf("Invalid expression")
 }
 
-func (b binary) Evaluate(env *Stmtsenv) (obj, error) {
+func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	left, err := b.left.Evaluate(env)
 	if err != nil {
 		return nil, err
@@ -465,8 +491,25 @@ func (b binary) Evaluate(env *Stmtsenv) (obj, error) {
 	return nil, fmt.Errorf("Invalid expression.")
 }
 
-func (a assigment) Evaluate(env *Stmtsenv) (obj, error) {
-	return nil, nil
+func (a assigment) Evaluate(env *Stmtsenv) (Obj, error) {
+	cur := env
+	lv, isStorageTarget := a.storeTarget.(primary)
+	if !(isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER) {
+		return nil, fmt.Errorf("Cannot use the l-value as storage target")
+	}
+	for cur != nil {
+		_, itExist := cur.Local[lv.node.Lexem]
+		if itExist {
+			rv, err := a.right.Evaluate(env)
+			if err != nil {
+				return nil, err
+			}
+			cur.Local[lv.node.Lexem] = rv
+			return rv, nil
+		}
+		cur = cur.Encloser
+	}
+	return nil, fmt.Errorf("Undefined variable at line %d", a.operator.Line)
 }
 
 // TODO: grammer for tenary expressions
@@ -491,7 +534,6 @@ func (tkn Tokens) asignment() (Exp, error) {
 		if isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER {
 			//consume "="
 			current++
-			//lv is a storage target
 			rv, err := tkn.asignment()
 			if err != nil {
 				return nil, err
@@ -618,7 +660,6 @@ Matching_Loop:
 			}
 		}
 		break
-		//fmt.Println("Stuck here")
 	}
 	return uexpleft, nil
 }
@@ -636,6 +677,8 @@ func (tkn Tokens) unary() (Exp, error) {
 	}
 	return tkn.primary()
 }
+
+// rule for producing operands
 func (tkn Tokens) primary() (Exp, error) {
 	ttype := tkn[current].Ttype
 	tnode := primary{}
@@ -647,23 +690,25 @@ func (tkn Tokens) primary() (Exp, error) {
 	case scanner.FALSE:
 	case scanner.NIL:
 	case scanner.LEFT_PAREN:
-		//check if next token is EOF , if not consume the LEFT_BRACE token and call expression
-		if current+1 >= len(tkn) {
-			return nil, fmt.Errorf("Expected an expression token but got EOF")
+		{
+			//check if next token is EOF , if not consume the LEFT_BRACE token and call expression
+			if current+1 >= len(tkn) {
+				return nil, fmt.Errorf("Expected an expression token but got EOF")
+			}
+			current++
+			Exp, err := tkn.asignment()
+			if err != nil {
+				return nil, err
+			}
+			if tkn[current].Ttype != scanner.RIGHT_PAREN {
+				return nil, fmt.Errorf("Expected a RIGHT_BRACE token but got %d", tkn[current].Ttype)
+			}
+			current++
+			return Exp, nil
 		}
-		current++
-		Exp, err := tkn.expression()
-		if err != nil {
-			return nil, err
-		}
-		if tkn[current].Ttype != scanner.RIGHT_PAREN {
-			return nil, fmt.Errorf("Expected a RIGHT_BRACE token but got %d", tkn[current].Ttype)
-		}
-		current++
-		return Exp, nil
 	default:
 		//invalid expresion token
-		return nil, fmt.Errorf("Expected an expression token but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected an expression token but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	tnode.node = tkn[current]
 	current++

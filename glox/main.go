@@ -12,6 +12,7 @@ import (
 
 func main() {
 	args := os.Args
+
 	if len(args) > 2 {
 		fmt.Printf("Usage: glox [path_to_script]\n")
 		os.Exit(1)
@@ -27,17 +28,19 @@ func main() {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
 		}
-		t, err := parser.Parser(tokens)
+		globalEnv := parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
+		stmts, err := parser.Parser(tokens, &globalEnv)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
 		}
-		res, err := t.Evaluate(nil)
-		if err != nil {
-			fmt.Printf("%s\n", err.Error())
-			os.Exit(1)
+		for _, stmt := range stmts {
+			err := stmt.Execute(&globalEnv)
+			if err != nil {
+				fmt.Printf("%s\n", err.Error())
+				os.Exit(1)
+			}
 		}
-		fmt.Printf("%v\n", res)
 	} else {
 		fmt.Print("Run: REPL\n")
 	}
