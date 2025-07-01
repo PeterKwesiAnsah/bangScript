@@ -54,6 +54,12 @@ type primary struct {
 	node *scanner.Token
 }
 
+type ifStmt struct {
+	condition Exp
+	thenbody  Stmt
+	elsebody  Stmt
+}
+
 type blockStmt struct {
 	stmts []Stmt
 	env   Stmtsenv
@@ -73,6 +79,9 @@ type expStmt struct {
 }
 
 var current int = 0
+
+func (t ifStmt) Execute(env *Stmtsenv) error
+func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error)
 
 func (t blockStmt) Execute(env *Stmtsenv) error {
 	for _, stmt := range t.stmts {
