@@ -31,6 +31,17 @@ type assigment struct {
 	right Exp
 }
 
+type logicalOr struct {
+	left     Exp
+	operator *scanner.Token
+	right    Exp
+}
+type logicalAnd struct {
+	left     Exp
+	operator *scanner.Token
+	right    Exp
+}
+
 type binary struct {
 	left     Exp
 	operator *scanner.Token
@@ -59,6 +70,10 @@ type ifStmt struct {
 	thenbody  Stmt
 	elsebody  Stmt
 }
+type whleStmt struct {
+	condition Exp
+	body      Stmt
+}
 
 type blockStmt struct {
 	stmts []Stmt
@@ -79,6 +94,9 @@ type expStmt struct {
 }
 
 var current int = 0
+
+func (t whleStmt) Execute(env *Stmtsenv) error
+func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error)
 
 func (t ifStmt) Execute(env *Stmtsenv) error
 func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error)
@@ -235,7 +253,8 @@ func Parser(tkn Tokens, globalEnv *Stmtsenv) ([]Stmt, error) {
 // program->declarations*EOF
 // declarations->varDeclar | statements
 // varDeclar->"var" IDENTIFIER (=expression)?";"
-// statements->printStmt | block | expressionStmt
+// statements->printStmt | blockStmt | expressionStmt | ifStmt
+// "if(exp)
 // block->"{" declarations* "}"
 // printStmt->"print" expression ";"
 // expressionStmt->expression;
@@ -499,7 +518,8 @@ func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return nil, fmt.Errorf("Invalid expression.")
 }
-
+func (t logicalAnd) Evaluate(env *Stmtsenv) (Obj, error)
+func (t logicalOr) Evaluate(env *Stmtsenv) (Obj, error)
 func (a assigment) Evaluate(env *Stmtsenv) (Obj, error) {
 	cur := env
 	lv, isStorageTarget := a.storeTarget.(primary)
@@ -530,7 +550,7 @@ func (tkn Tokens) expression() (Exp, error) {
 	return tkn.asignment()
 }
 func (tkn Tokens) asignment() (Exp, error) {
-	exp, err := tkn.equality()
+	exp, err := tkn.logicOr()
 	if err != nil {
 		return nil, err
 	}
@@ -550,10 +570,69 @@ func (tkn Tokens) asignment() (Exp, error) {
 			ass := assigment{lv, op, rv}
 			return ass, nil
 		}
-		//if i had a print method to my exp interface , i could have called it here cool right. Maybe add this later
+		//if i had a print method to my exp interface , i could have called it here. cool right. Maybe add this later
 		return nil, fmt.Errorf("Cannot use the l-value as storage target ")
 	}
 	return exp, nil
+}
+
+func (tkn Tokens) logicOr() (Exp, error) {
+	expleft, err := tkn.logicAnd()
+	opsToMatch := []scanner.Tokentype{
+		scanner.OR,
+	}
+	if err != nil {
+		return nil, err
+	}
+Matching_Loop:
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		for _, op := range opsToMatch {
+			if cToken.Ttype == op {
+				//consume operator terminal
+				current++
+				op := cToken
+				expright, err := tkn.logicAnd()
+				if err != nil {
+					return nil, err
+				}
+				expleft = logicalOr{left: expleft, operator: op, right: expright}
+				break Matching_Loop
+			}
+		}
+		break
+	}
+	return expleft, nil
+}
+func (tkn Tokens) logicAnd() (Exp, error) {
+	expleft, err := tkn.equality()
+	opsToMatch := []scanner.Tokentype{
+		scanner.AND,
+	}
+	if err != nil {
+		return nil, err
+	}
+Matching_Loop:
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		for _, op := range opsToMatch {
+			if cToken.Ttype == op {
+				//consume operator terminal
+				current++
+				op := cToken
+				expright, err := tkn.equality()
+				if err != nil {
+					return nil, err
+				}
+				expleft = logicalAnd{left: expleft, operator: op, right: expright}
+				break Matching_Loop
+			}
+		}
+		break
+	}
+	return expleft, nil
 }
 
 func (tkn Tokens) equality() (Exp, error) {
