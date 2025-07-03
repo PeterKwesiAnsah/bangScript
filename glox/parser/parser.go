@@ -73,6 +73,8 @@ type ifStmt struct {
 type whleStmt struct {
 	condition Exp
 	body      Stmt
+	//for easy for loops implementation
+	sideEffect Exp
 }
 
 type blockStmt struct {
@@ -95,6 +97,66 @@ type expStmt struct {
 
 var current int = 0
 
+func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
+	var initializer Stmt = nil
+	var condition Exp = nil
+	var sideEffect Exp = nil
+	var body Stmt = nil
+	var err error
+	if tkn[current].Ttype != scanner.LEFT_PAREN {
+		return nil, fmt.Errorf("Expected left paren after for but got %d", tkn[current].Ttype)
+	}
+	current++
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		initializer, err = tkn.declarations(env)
+		if err != nil {
+			return nil, err
+		}
+		//automatically consumes the semi-colon token
+	} else {
+		current++
+	}
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		condition, err = tkn.expression()
+		if err != nil {
+			return nil, err
+		}
+		//expect semicolon
+		if tkn[current].Ttype != scanner.SEMICOLON {
+			return nil, fmt.Errorf("Expected semi-colon after condition but got %d", tkn[current].Ttype)
+		}
+		current++
+	} else {
+		current++
+	}
+	if tkn[current].Ttype == scanner.RIGHT_PAREN {
+		current++
+	} else {
+		sideEffect, err = tkn.expression()
+		if err != nil {
+			return nil, err
+		}
+		//expect right paren
+		if tkn[current].Ttype != scanner.RIGHT_PAREN {
+			return nil, fmt.Errorf("Expected right paren after side effect expression but got %d", tkn[current].Ttype)
+		}
+		current++
+	}
+	body, err = tkn.declarations(env)
+	if err != nil {
+		return nil, err
+	}
+
+	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
+	stmts := []Stmt{initializer, whleStmt{condition: condition, body: body, sideEffect: sideEffect}}
+	stmt := blockStmt{}
+
+	Encloser := env
+	inner.Encloser = Encloser
+	stmt.env = inner
+	stmt.stmts = stmts
+	return stmt, nil
+}
 func (t whleStmt) Execute(env *Stmtsenv) error {
 	var executionErr error
 	var evalErr error
@@ -103,6 +165,14 @@ executeBody:
 	executionErr = t.body.Execute(env)
 	if executionErr != nil {
 		return executionErr
+	}
+	goto executeSideEffect
+executeSideEffect:
+	if t.sideEffect != nil {
+		_, executionErr := t.sideEffect.Evaluate(env)
+		if executionErr != nil {
+			return executionErr
+		}
 	}
 	goto evaluateAndtest
 evaluateAndtest:
@@ -119,7 +189,7 @@ evaluateAndtest:
 
 func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
-		return nil, fmt.Errorf("Expected left paren after if but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected left paren after while but got %d", tkn[current].Ttype)
 	}
 	current++
 	cond, err := tkn.expression()
@@ -127,9 +197,10 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 		return nil, err
 	}
 	if tkn[current].Ttype != scanner.RIGHT_PAREN {
-		return nil, fmt.Errorf("Expected right paren after if but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected right paren after condition but got %d", tkn[current].Ttype)
 	}
 	current++
+	//TODO: use tkn.statement()
 	bodyStmt, err := tkn.declarations(Encloser)
 	if err != nil {
 		return nil, err
@@ -171,9 +242,10 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 		return nil, err
 	}
 	if tkn[current].Ttype != scanner.RIGHT_PAREN {
-		return nil, fmt.Errorf("Expected right paren after if but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected right paren after condition but got %d", tkn[current].Ttype)
 	}
 	current++
+	//TODO: use tkn.statement()
 	stmtBody, err := tkn.declarations(Encloser)
 	if err != nil {
 		return nil, err
@@ -181,6 +253,7 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 	var elseStmt Stmt = nil
 	if tkn[current].Ttype == scanner.ELSE {
 		current++
+		//TODO: use tkn.statement()
 		elseStmt, err = tkn.declarations(Encloser)
 		if err != nil {
 			return nil, err
@@ -328,6 +401,9 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	} else if curT.Ttype == scanner.WHILE {
 		current++
 		return tkn.whileStmt(Encloser)
+	} else if curT.Ttype == scanner.FOR {
+		current++
+		return tkn.forStmt(Encloser)
 	}
 	//expression statement
 	return tkn.expStmt()
