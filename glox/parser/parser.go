@@ -95,9 +95,34 @@ type expStmt struct {
 
 var current int = 0
 
-func (t whleStmt) Execute(env *Stmtsenv) error
+func (t whleStmt) Execute(env *Stmtsenv) error {
+	isTruthy, err := isTruthy(&t.condition, env)
+	if err != nil {
+		return err
+	}
+	if isTruthy {
+		return t.body.Execute(env)
+	}
+	return nil
+}
 func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
-	return nil, nil
+	if tkn[current].Ttype != scanner.LEFT_PAREN {
+		return nil, fmt.Errorf("Expected left paren after if but got %d", tkn[current].Ttype)
+	}
+	current++
+	cond, err := tkn.expression()
+	if err != nil {
+		return nil, err
+	}
+	if tkn[current].Ttype != scanner.RIGHT_PAREN {
+		return nil, fmt.Errorf("Expected right paren after if but got %d", tkn[current].Ttype)
+	}
+	current++
+	bodyStmt, err := tkn.declarations(Encloser)
+	if err != nil {
+		return nil, err
+	}
+	return whleStmt{condition: cond, body: bodyStmt}, nil
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
