@@ -96,20 +96,14 @@ type expStmt struct {
 var current int = 0
 
 func (t whleStmt) Execute(env *Stmtsenv) error
-func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error)
+func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
+	return nil, nil
+}
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
-	val, err := t.condition.Evaluate(env)
+	isTruthy, err := isTruthy(&t.condition, env)
 	if err != nil {
 		return err
-	}
-	isTruthy := true
-	var falsyVal []Obj = []Obj{"", nil, 0, false}
-	for _, falsy := range falsyVal {
-		if falsy == val {
-			isTruthy = false
-			break
-		}
 	}
 	if isTruthy {
 		err := t.thenbody.Execute(env)
@@ -291,6 +285,9 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	} else if curT.Ttype == scanner.IF {
 		current++
 		return tkn.ifStmt(Encloser)
+	} else if curT.Ttype == scanner.WHILE {
+		current++
+		return tkn.whileStmt(Encloser)
 	}
 	//expression statement
 	return tkn.expStmt()
@@ -859,6 +856,23 @@ func (tkn Tokens) primary() (Exp, error) {
 	tnode.node = tkn[current]
 	current++
 	return tnode, nil
+}
+
+func isTruthy(p *Exp, env *Stmtsenv) (bool, error) {
+	exp := *p
+	val, err := exp.Evaluate(env)
+	if err != nil {
+		return false, err
+	}
+	isTruthy := true
+	var falsyVal []Obj = []Obj{"", nil, 0, false}
+	for _, falsy := range falsyVal {
+		if falsy == val {
+			isTruthy = false
+			break
+		}
+	}
+	return isTruthy, nil
 }
 
 /////////////////////////////////////////////////////end of expression rules
