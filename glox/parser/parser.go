@@ -96,15 +96,27 @@ type expStmt struct {
 var current int = 0
 
 func (t whleStmt) Execute(env *Stmtsenv) error {
-	isTruthy, err := isTruthy(&t.condition, env)
-	if err != nil {
-		return err
+	var executionErr error
+	var evalErr error
+	goto evaluateAndtest
+executeBody:
+	executionErr = t.body.Execute(env)
+	if executionErr != nil {
+		return executionErr
 	}
-	if isTruthy {
-		return t.body.Execute(env)
+	goto evaluateAndtest
+evaluateAndtest:
+	obj, evalErr := t.condition.Evaluate(env)
+	if evalErr != nil {
+		return evalErr
+	}
+	isTruth := isTruthy(obj)
+	if isTruth {
+		goto executeBody
 	}
 	return nil
 }
+
 func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
 		return nil, fmt.Errorf("Expected left paren after if but got %d", tkn[current].Ttype)
@@ -126,11 +138,14 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
-	isTruthy, err := isTruthy(&t.condition, env)
+
+	obj, err := t.condition.Evaluate(env)
 	if err != nil {
 		return err
 	}
-	if isTruthy {
+	isTruth := isTruthy(obj)
+
+	if isTruth {
 		err := t.thenbody.Execute(env)
 		if err != nil {
 			return err
@@ -598,8 +613,45 @@ func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return nil, fmt.Errorf("Invalid expression.")
 }
-func (t logicalAnd) Evaluate(env *Stmtsenv) (Obj, error)
-func (t logicalOr) Evaluate(env *Stmtsenv) (Obj, error)
+func (t logicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
+	objL, err := t.left.Evaluate(env)
+
+	if err != nil {
+		return nil, err
+	}
+	isTrueL := isTruthy(objL)
+	//short circuit
+	if !isTrueL {
+		return objL, nil
+	}
+	objR, err := t.right.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	isTrueR := isTruthy(objR)
+	if isTrueR {
+		return objR, nil
+	}
+	return objL, nil
+}
+func (t logicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
+	objL, err := t.left.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	isTrueL := isTruthy(objL)
+
+	//short circuit
+	if isTrueL {
+		return objL, nil
+	}
+	objR, err := t.right.Evaluate(env)
+
+	if err != nil {
+		return nil, err
+	}
+	return objR, nil
+}
 func (a assigment) Evaluate(env *Stmtsenv) (Obj, error) {
 	cur := env
 	lv, isStorageTarget := a.storeTarget.(primary)
@@ -883,12 +935,7 @@ func (tkn Tokens) primary() (Exp, error) {
 	return tnode, nil
 }
 
-func isTruthy(p *Exp, env *Stmtsenv) (bool, error) {
-	exp := *p
-	val, err := exp.Evaluate(env)
-	if err != nil {
-		return false, err
-	}
+func isTruthy(val Obj) bool {
 	isTruthy := true
 	var falsyVal []Obj = []Obj{"", nil, 0, false}
 	for _, falsy := range falsyVal {
@@ -897,7 +944,7 @@ func isTruthy(p *Exp, env *Stmtsenv) (bool, error) {
 			break
 		}
 	}
-	return isTruthy, nil
+	return isTruthy
 }
 
 /////////////////////////////////////////////////////end of expression rules
