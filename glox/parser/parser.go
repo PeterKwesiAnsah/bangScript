@@ -48,7 +48,7 @@ type binary struct {
 	right    Exp
 }
 
-// for handling conditional operations
+// TODO: for handling conditional operations
 type tenary struct {
 	condition Exp
 	operator  *scanner.Token
@@ -98,8 +98,62 @@ var current int = 0
 func (t whleStmt) Execute(env *Stmtsenv) error
 func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error)
 
-func (t ifStmt) Execute(env *Stmtsenv) error
-func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error)
+func (t ifStmt) Execute(env *Stmtsenv) error {
+	val, err := t.condition.Evaluate(env)
+	if err != nil {
+		return err
+	}
+	isTruthy := true
+	var falsyVal []Obj = []Obj{"", nil, 0, false}
+	for _, falsy := range falsyVal {
+		if falsy == val {
+			isTruthy = false
+			break
+		}
+	}
+	if isTruthy {
+		err := t.thenbody.Execute(env)
+		if err != nil {
+			return err
+		}
+	} else {
+		if t.elsebody == nil {
+			return nil
+		}
+		err := t.elsebody.Execute(env)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
+	if tkn[current].Ttype != scanner.LEFT_PAREN {
+		return nil, fmt.Errorf("Expected left paren after if but got %d", tkn[current].Ttype)
+	}
+	current++
+	condexp, err := tkn.expression()
+	if err != nil {
+		return nil, err
+	}
+	if tkn[current].Ttype != scanner.RIGHT_PAREN {
+		return nil, fmt.Errorf("Expected right paren after if but got %d", tkn[current].Ttype)
+	}
+	current++
+	stmtBody, err := tkn.declarations(Encloser)
+	if err != nil {
+		return nil, err
+	}
+	var elseStmt Stmt = nil
+	if tkn[current].Ttype == scanner.ELSE {
+		current++
+		elseStmt, err = tkn.declarations(Encloser)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ifStmt{condition: condexp, thenbody: stmtBody, elsebody: elseStmt}, nil
+}
 
 func (t blockStmt) Execute(env *Stmtsenv) error {
 	for _, stmt := range t.stmts {
@@ -212,6 +266,7 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 	return stmt, nil
 }
 
+// TODO: have a statement rule , regular statements are different from variable declarations statements
 func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	curT := tkn[current]
 	if curT.Ttype == scanner.VAR {
@@ -233,6 +288,9 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 		current++
 		//block statement Only type of statement with multiple statements bounded by an env, all other statements take their context
 		return tkn.blockStmt(Encloser)
+	} else if curT.Ttype == scanner.IF {
+		current++
+		return tkn.ifStmt(Encloser)
 	}
 	//expression statement
 	return tkn.expStmt()
