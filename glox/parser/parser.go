@@ -73,6 +73,7 @@ type ifStmt struct {
 type whleStmt struct {
 	condition Exp
 	body      Stmt
+	init      Stmt
 	//for easy for loops implementation
 	//sideEffect Exp
 	env Stmtsenv
@@ -151,8 +152,8 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	// empty body
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		//initializer runs in the same scope as the condition
-		return whleStmt{condition: condition, body: blockStmt{
-			stmts: []Stmt{initializer, blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: whileScope}},
+		return whleStmt{condition: condition, init: initializer, body: blockStmt{
+			stmts: []Stmt{blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: whileScope}},
 			env:   whileScope,
 		}, env: whileScope}, nil
 	}
@@ -166,15 +167,15 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		env := bs.env
 		stmts = append(stmts, expStmt{exp: sideEffect})
 		//we should expect a scope already created
-		return whleStmt{condition: condition, body: blockStmt{
+		return whleStmt{condition: condition, init: initializer, body: blockStmt{
 			//initializer runs in the same scope as the condition
-			stmts: []Stmt{initializer, blockStmt{stmts: stmts, env: env}},
+			stmts: []Stmt{blockStmt{stmts: stmts, env: env}},
 			env:   whileScope,
 		}, env: whileScope}, nil
 	} else {
-		return whleStmt{condition: condition, body: blockStmt{
+		return whleStmt{condition: condition, init: initializer, body: blockStmt{
 			//initializer runs in the same scope as the condition
-			stmts: []Stmt{initializer, blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}}, env: whileScope}},
+			stmts: []Stmt{blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}}, env: whileScope}},
 			env:   whileScope,
 		}, env: whileScope}, nil
 	}
