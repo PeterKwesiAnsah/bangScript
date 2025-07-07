@@ -74,7 +74,8 @@ type whleStmt struct {
 	condition Exp
 	body      Stmt
 	//for easy for loops implementation
-	sideEffect Exp
+	//sideEffect Exp
+	env Stmtsenv
 }
 
 type blockStmt struct {
@@ -97,22 +98,26 @@ type expStmt struct {
 
 var current int = 0
 
+// Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var initializer Stmt = nil
 	var condition Exp = nil
 	var sideEffect Exp = nil
 	var body Stmt = nil
 	var err error
+	whileScope := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
+	//
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
 		return nil, fmt.Errorf("Expected left paren after for but got %d", tkn[current].Ttype)
 	}
 	current++
 	if tkn[current].Ttype != scanner.SEMICOLON {
-		initializer, err = tkn.declarations(env)
+		//create new scope for variable declaration, linked to the loop body
+		initializer, err = tkn.declarations(&whileScope)
 		if err != nil {
 			return nil, err
 		}
-		//automatically consumes the semi-colon token
+		//automatically consumes the semi-colon token because we are passing the initializer as a statement (expression statement for assignment/variable decl)
 	} else {
 		current++
 	}
@@ -142,21 +147,40 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		current++
 	}
-	body, err = tkn.declarations(env)
+
+	// empty body
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		//initializer runs in the same scope as the condition
+		return whleStmt{condition: condition, body: blockStmt{
+			stmts: []Stmt{initializer, blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: whileScope}},
+			env:   whileScope,
+		}, env: whileScope}, nil
+	}
+	body, err = tkn.declarations(&whileScope)
 	if err != nil {
 		return nil, err
 	}
-
-	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
-	stmts := []Stmt{initializer, whleStmt{condition: condition, body: body, sideEffect: sideEffect}}
-	stmt := blockStmt{}
-
-	Encloser := env
-	inner.Encloser = Encloser
-	stmt.env = inner
-	stmt.stmts = stmts
-	return stmt, nil
+	bs, isBS := body.(blockStmt)
+	if isBS {
+		stmts := bs.stmts
+		env := bs.env
+		stmts = append(stmts, expStmt{exp: sideEffect})
+		//we should expect a scope already created
+		return whleStmt{condition: condition, body: blockStmt{
+			//initializer runs in the same scope as the condition
+			stmts: []Stmt{initializer, blockStmt{stmts: stmts, env: env}},
+			env:   whileScope,
+		}, env: whileScope}, nil
+	} else {
+		return whleStmt{condition: condition, body: blockStmt{
+			//initializer runs in the same scope as the condition
+			stmts: []Stmt{initializer, blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}}, env: whileScope}},
+			env:   whileScope,
+		}, env: whileScope}, nil
+	}
 }
+
+// while statement needs it own env
 func (t whleStmt) Execute(env *Stmtsenv) error {
 	var executionErr error
 	var evalErr error
@@ -165,14 +189,6 @@ executeBody:
 	executionErr = t.body.Execute(env)
 	if executionErr != nil {
 		return executionErr
-	}
-	goto executeSideEffect
-executeSideEffect:
-	if t.sideEffect != nil {
-		_, executionErr := t.sideEffect.Evaluate(env)
-		if executionErr != nil {
-			return executionErr
-		}
 	}
 	goto evaluateAndtest
 evaluateAndtest:

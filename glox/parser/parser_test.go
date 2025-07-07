@@ -15,6 +15,7 @@ func makeToken(tokenType scanner.Tokentype, lexeme string, line int) *scanner.To
 	}
 }
 
+// TODO: we parse source as []byte without EOF
 func TestPrimaryExpression(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -54,7 +55,7 @@ func TestPrimaryExpression(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			primResult, err := Parser(tt.tokens)
+			primResult, err := tt.tokens.expression()
 			if err != nil {
 				t.Fatalf("Expected primary expression, got %s", err.Error())
 			}
@@ -119,7 +120,7 @@ func TestUnaryExpression(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			unaryResult, err := Parser(tt.tokens)
+			unaryResult, err := tt.tokens.expression()
 			if err != nil {
 				t.Fatalf("Expected unary expression, got %T", err)
 			}
@@ -323,7 +324,7 @@ func TestBinaryExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := Parser(tt.tokens)
+			result, err := tt.tokens.expression()
 			if err != nil {
 				t.Fatalf("Expected binary expression, got error: %s", err.Error())
 			}
@@ -378,7 +379,7 @@ func TestParenthesizeExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := Parser(tt.tokens)
+			result, err := tt.tokens.expression()
 			if err != nil {
 				t.Fatalf("Expected grouping expression, got error: %s", err.Error())
 			}
@@ -493,7 +494,7 @@ func TestOperatorPrecedence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := Parser(tt.tokens)
+			result, err := tt.tokens.expression()
 			if err != nil {
 				t.Fatalf("Expected expression, got error: %s", err.Error())
 			}
@@ -504,5 +505,3 @@ func TestOperatorPrecedence(t *testing.T) {
 		})
 	}
 }
-
-//evaluating parsed expressions
