@@ -396,6 +396,7 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
 	}
+	current++
 	return stmt, nil
 }
 
@@ -801,11 +802,11 @@ func (tkn Tokens) asignment() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			if tkn[current].Ttype != scanner.SEMICOLON {
-				return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
-			}
+			//if tkn[current].Ttype != scanner.SEMICOLON {
+			//return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+			//}
 			ass := assigment{lv, op, rv}
-			current++
+			//current++
 			return ass, nil
 		}
 		//if i had a print method to my exp interface , i could have called it here. cool right. Maybe add this later
