@@ -107,7 +107,6 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var body Stmt = nil
 	var err error
 	whileScope := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
-	//
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
 		return nil, fmt.Errorf("Expected left paren after for but got %d", tkn[current].Ttype)
 	}
@@ -185,6 +184,16 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 func (t whleStmt) Execute(env *Stmtsenv) error {
 	var executionErr error
 	var evalErr error
+	bs, isBS := t.body.(blockStmt)
+	if isBS {
+		env = &bs.env
+	}
+	if t.init != nil {
+		executionErr = t.init.Execute(&t.env)
+		if executionErr != nil {
+			return executionErr
+		}
+	}
 	goto evaluateAndtest
 executeBody:
 	executionErr = t.body.Execute(env)
@@ -193,7 +202,7 @@ executeBody:
 	}
 	goto evaluateAndtest
 evaluateAndtest:
-	obj, evalErr := t.condition.Evaluate(env)
+	obj, evalErr := t.condition.Evaluate(&t.env)
 	if evalErr != nil {
 		return evalErr
 	}
@@ -222,7 +231,7 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return whleStmt{condition: cond, body: bodyStmt}, nil
+	return whleStmt{condition: cond, body: bodyStmt, env: *Encloser}, nil
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
@@ -792,7 +801,11 @@ func (tkn Tokens) asignment() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
+			if tkn[current].Ttype != scanner.SEMICOLON {
+				return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+			}
 			ass := assigment{lv, op, rv}
+			current++
 			return ass, nil
 		}
 		//if i had a print method to my exp interface , i could have called it here. cool right. Maybe add this later
