@@ -12,6 +12,7 @@ type Obj interface{}
 type Exp interface {
 	//should take in an environment or context
 	Evaluate(env *Stmtsenv) (Obj, error)
+	//print() string
 }
 
 type Stmt interface {
@@ -70,13 +71,11 @@ type ifStmt struct {
 	thenbody  Stmt
 	elsebody  Stmt
 }
-type whleStmt struct {
+type whileStmt struct {
 	condition Exp
 	body      Stmt
 	init      Stmt
-	//for easy for loops implementation
-	//sideEffect Exp
-	env Stmtsenv
+	env       Stmtsenv
 }
 
 type blockStmt struct {
@@ -106,18 +105,18 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var sideEffect Exp = nil
 	var body Stmt = nil
 	var err error
+	//create scope for initializer
 	whileScope := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
-		return nil, fmt.Errorf("Expected left paren after for but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected left paren after for but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	if tkn[current].Ttype != scanner.SEMICOLON {
-		//create new scope for variable declaration, linked to the loop body
-		initializer, err = tkn.declarations(&whileScope)
+		initializer, err = tkn.declarations(nil)
 		if err != nil {
 			return nil, err
 		}
-		//automatically consumes the semi-colon token because we are passing the initializer as a statement (expression statement for assignment/variable decl)
+		//automatically consumes the semi-colon token because we are parsing the initializer as a statement (expression statement for assignment/variable decl)
 	} else {
 		current++
 	}
@@ -128,7 +127,7 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		//expect semicolon
 		if tkn[current].Ttype != scanner.SEMICOLON {
-			return nil, fmt.Errorf("Expected semi-colon after condition but got %d", tkn[current].Ttype)
+			return nil, fmt.Errorf("Expected semi-colon after condition but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 		}
 		current++
 	} else {
@@ -143,18 +142,19 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		//expect right paren
 		if tkn[current].Ttype != scanner.RIGHT_PAREN {
-			return nil, fmt.Errorf("Expected right paren after side effect expression but got %d", tkn[current].Ttype)
+			return nil, fmt.Errorf("Expected right paren after side effect expression but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 		}
 		current++
 	}
 
 	// empty body
-	if tkn[current].Ttype != scanner.SEMICOLON {
+	if tkn[current].Ttype == scanner.SEMICOLON {
 		//initializer runs in the same scope as the condition
-		return whleStmt{condition: condition, init: initializer, body: blockStmt{
-			stmts: []Stmt{blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: whileScope}},
-			env:   whileScope,
-		}, env: whileScope}, nil
+		return whileStmt{condition: condition, init: initializer,
+			body: blockStmt{
+				stmts: []Stmt{blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: whileScope}},
+				env:   whileScope,
+			}, env: whileScope}, nil
 	}
 	body, err = tkn.declarations(&whileScope)
 	if err != nil {
@@ -163,31 +163,32 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	bs, isBS := body.(blockStmt)
 	if isBS {
 		stmts := bs.stmts
-		env := bs.env
 		stmts = append(stmts, expStmt{exp: sideEffect})
 		//we should expect a scope already created
-		return whleStmt{condition: condition, init: initializer, body: blockStmt{
+		return whileStmt{condition: condition, init: initializer, body: blockStmt{
 			//initializer runs in the same scope as the condition
-			stmts: []Stmt{blockStmt{stmts: stmts, env: env}},
+			stmts: []Stmt{blockStmt{stmts: stmts, env: bs.env}},
 			env:   whileScope,
 		}, env: whileScope}, nil
 	} else {
-		return whleStmt{condition: condition, init: initializer, body: blockStmt{
+		return whileStmt{condition: condition, init: initializer, body: blockStmt{
 			//initializer runs in the same scope as the condition
-			stmts: []Stmt{blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}}, env: whileScope}},
-			env:   whileScope,
+			stmts: []Stmt{
+				blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
+					env: whileScope}},
+			env: whileScope,
 		}, env: whileScope}, nil
 	}
 }
 
 // while statement needs it own env
-func (t whleStmt) Execute(env *Stmtsenv) error {
+func (t whileStmt) Execute(env *Stmtsenv) error {
 	var executionErr error
 	var evalErr error
-	bs, isBS := t.body.(blockStmt)
-	if isBS {
-		env = &bs.env
-	}
+	//env should be nil
+	//if env != nil {
+	//return fmt.Errorf("Block statements does not need the caller's env")
+	//}
 	if t.init != nil {
 		executionErr = t.init.Execute(&t.env)
 		if executionErr != nil {
@@ -196,12 +197,26 @@ func (t whleStmt) Execute(env *Stmtsenv) error {
 	}
 	goto evaluateAndtest
 executeBody:
-	executionErr = t.body.Execute(env)
-	if executionErr != nil {
-		return executionErr
+	{
+		env := &t.env
+		_, isBs := t.body.(blockStmt)
+		_, isWs := t.body.(whileStmt)
+		if isBs || isWs {
+			//block statement/while have their own environment
+			env = nil
+		}
+		executionErr = t.body.Execute(env)
+		//TODO: body can be nil
+		if executionErr != nil {
+			return executionErr
+		}
+		goto evaluateAndtest
 	}
-	goto evaluateAndtest
 evaluateAndtest:
+	//infinite loop equivalent to while(true)
+	if t.condition == nil {
+		goto executeBody
+	}
 	obj, evalErr := t.condition.Evaluate(&t.env)
 	if evalErr != nil {
 		return evalErr
@@ -215,7 +230,7 @@ evaluateAndtest:
 
 func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
-		return nil, fmt.Errorf("Expected left paren after while but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected left paren after while but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	cond, err := tkn.expression()
@@ -223,7 +238,7 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 		return nil, err
 	}
 	if tkn[current].Ttype != scanner.RIGHT_PAREN {
-		return nil, fmt.Errorf("Expected right paren after condition but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected right paren after condition but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	//TODO: use tkn.statement()
@@ -231,7 +246,7 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return whleStmt{condition: cond, body: bodyStmt, env: *Encloser}, nil
+	return whileStmt{condition: cond, body: bodyStmt, env: *Encloser}, nil
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
@@ -243,6 +258,13 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 	isTruth := isTruthy(obj)
 
 	if isTruth {
+		env := env
+		_, isBs := t.thenbody.(blockStmt)
+		_, isWs := t.thenbody.(whileStmt)
+		if isBs || isWs {
+			//block or while statement have their own environment
+			env = nil
+		}
 		err := t.thenbody.Execute(env)
 		if err != nil {
 			return err
@@ -250,6 +272,13 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 	} else {
 		if t.elsebody == nil {
 			return nil
+		}
+		env := env
+		_, isBs := t.elsebody.(blockStmt)
+		_, isWs := t.elsebody.(whileStmt)
+		if isBs || isWs {
+			//block or while statement have their own environment
+			env = nil
 		}
 		err := t.elsebody.Execute(env)
 		if err != nil {
@@ -260,7 +289,7 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 }
 func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
-		return nil, fmt.Errorf("Expected left paren after if but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected left paren after if but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	condexp, err := tkn.expression()
@@ -268,7 +297,7 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 		return nil, err
 	}
 	if tkn[current].Ttype != scanner.RIGHT_PAREN {
-		return nil, fmt.Errorf("Expected right paren after condition but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected right paren after condition but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	//TODO: use tkn.statement()
@@ -289,7 +318,13 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 }
 
 func (t blockStmt) Execute(env *Stmtsenv) error {
+	//if env != nil {
+	//return fmt.Errorf("Block statements does not need the caller's env")
+	//}
 	for _, stmt := range t.stmts {
+		if stmt == nil {
+			continue
+		}
 		err := stmt.Execute(&t.env)
 		if err != nil {
 			return err
@@ -300,7 +335,7 @@ func (t blockStmt) Execute(env *Stmtsenv) error {
 
 // first blockStmt in call stack , will be called with the global env and subsequent ones will be wrapped recursively in a linked list
 func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
-	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
+	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: Encloser}
 	stmts := []Stmt{}
 	stmt := blockStmt{}
 	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
@@ -309,14 +344,12 @@ func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 			return nil, err
 		}
 		stmts = append(stmts, stmt)
-		//current++
 	}
 	if tkn[current].Ttype != scanner.RIGHT_BRACE {
-		return nil, fmt.Errorf("Expected a right brace but got EOF")
+		return nil, fmt.Errorf("Expected a right brace but got EOF at line %d", tkn[current].Line)
 	}
 	current++
 	stmt.stmts = stmts
-	inner.Encloser = Encloser
 	stmt.env = inner
 	return stmt, nil
 }
@@ -338,25 +371,30 @@ func (tkn Tokens) printStmt() (Stmt, error) {
 	stmt.exp = exp
 	//expect a ";" terminator
 	if tkn[current].Ttype != scanner.SEMICOLON {
-		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	return stmt, nil
 }
 
 func (t varStmt) Execute(env *Stmtsenv) error {
-	Obj, err := t.exp.Evaluate(env)
-	if err != nil {
-		return err
+	var obj Obj = nil
+	//check if variable declaration have a definition
+	if t.exp != nil {
+		var err error
+		obj, err = t.exp.Evaluate(env)
+		if err != nil {
+			return err
+		}
 	}
-	env.Local[t.name.Lexem] = Obj
+	env.Local[t.name.Lexem] = obj
 	return nil
 }
 func (tkn Tokens) varStmt() (Stmt, error) {
 	stmt := varStmt{}
 	//expect identifier
 	if tkn[current].Ttype != scanner.IDENTIFIER {
-		return nil, fmt.Errorf("Expected an identifier after var but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected an identifier after var but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	stmt.name = tkn[current]
 	stmt.exp = nil
@@ -375,7 +413,7 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 	}
 	//expect a ";" terminator
 	if tkn[current].Ttype != scanner.SEMICOLON {
-		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	return stmt, nil
@@ -394,7 +432,7 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 	stmt.exp = exp
 	//expect a ";" terminator
 	if tkn[current].Ttype != scanner.SEMICOLON {
-		return nil, fmt.Errorf("Expected semi-colon but got %d", tkn[current].Ttype)
+		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	return stmt, nil
@@ -513,7 +551,7 @@ func (p primary) Evaluate(env *Stmtsenv) (Obj, error) {
 				}
 				cur = cur.Encloser
 			}
-			return nil, fmt.Errorf("Undefined varible at line %d", p.node.Line)
+			return nil, fmt.Errorf("Variable %s is undefined at line %d", p.node.Lexem, p.node.Line)
 		}
 	default:
 		return nil, fmt.Errorf("Expected a string, number, a target location , nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
@@ -552,6 +590,7 @@ func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	if err != nil {
 		return nil, err
 	}
+	// need to handle nil expressions nil + string or string + nil or nil + 1
 	switch b.operator.Ttype {
 	case scanner.PLUS:
 		{
@@ -802,11 +841,7 @@ func (tkn Tokens) asignment() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			//if tkn[current].Ttype != scanner.SEMICOLON {
-			//return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
-			//}
 			ass := assigment{lv, op, rv}
-			//current++
 			return ass, nil
 		}
 		//if i had a print method to my exp interface , i could have called it here. cool right. Maybe add this later
