@@ -24,6 +24,10 @@ type Stmtsenv struct {
 	Encloser *Stmtsenv
 }
 
+type list struct {
+	expressions []Exp
+}
+
 type assigment struct {
 	//l-value
 	storeTarget Exp
@@ -182,6 +186,7 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 }
 
 // while statement needs it own env
+// TODO: implements loop keyword like continue,break
 func (t whileStmt) Execute(env *Stmtsenv) error {
 	var executionErr error
 	var evalErr error
@@ -814,14 +819,39 @@ func (a assigment) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return nil, fmt.Errorf("Undefined variable at line %d", a.operator.Line)
 }
+func (l list) Evaluate(env *Stmtsenv) (Obj, error)
 
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 // Rule for parsing expressions into trees
+func (tkn Tokens) list() (Exp, error) {
+	exp, err := tkn.asignment()
+	if err != nil {
+		return nil, err
+	}
+	if tkn[current].Ttype == scanner.COMMA {
+		exps := []Exp{}
+		exps = append(exps, exp)
+		for {
+			if tkn[current].Ttype == scanner.COMMA {
+				current++
+				exp, err := tkn.asignment()
+				if err != nil {
+					return nil, err
+				}
+				exps = append(exps, exp)
+			} else {
+				//end of list
+				return list{expressions: exps}, nil
+			}
+		}
+	}
+	return exp, nil
+}
 func (tkn Tokens) expression() (Exp, error) {
-	return tkn.asignment()
+	return tkn.list()
 }
 func (tkn Tokens) asignment() (Exp, error) {
 	exp, err := tkn.logicOr()
