@@ -819,7 +819,19 @@ func (a assigment) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return nil, fmt.Errorf("Undefined variable at line %d", a.operator.Line)
 }
-func (l list) Evaluate(env *Stmtsenv) (Obj, error)
+func (l list) Evaluate(env *Stmtsenv) (Obj, error) {
+	var rvalue Obj
+	for index, exp := range l.expressions {
+		value, err := exp.Evaluate(env)
+		if err != nil {
+			return nil, err
+		}
+		if (index + 1) == len(l.expressions) {
+			rvalue = value
+		}
+	}
+	return rvalue, nil
+}
 
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
