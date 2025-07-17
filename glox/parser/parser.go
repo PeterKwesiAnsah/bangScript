@@ -45,6 +45,13 @@ type Stmtsenv struct {
 	Encloser *Stmtsenv
 }
 
+type call struct {
+	callee   Exp
+	operator *scanner.Token
+	arrity   int
+	args     Exp
+}
+
 type list struct {
 	expressions []Exp
 }
@@ -141,6 +148,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
+		//TODO: assert params args
 		params = exp
 		list, isListExp := exp.(list)
 		if !isListExp {
@@ -190,6 +198,7 @@ func (t funcDef) Execute(env *Stmtsenv) error
 
 // caller calls this
 // what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
+// we make copies of env
 func (t funcDef) call() error
 
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
@@ -926,12 +935,17 @@ func (l list) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return rvalue, nil
 }
+func (t call) Evaluate(env *Stmtsenv) (Obj, error)
 
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
 // TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 // Rule for parsing expressions into trees
+
+func (tkn Tokens) expression() (Exp, error) {
+	return tkn.list()
+}
 func (tkn Tokens) list() (Exp, error) {
 	exp, err := tkn.asignment()
 	if err != nil {
@@ -955,9 +969,6 @@ func (tkn Tokens) list() (Exp, error) {
 		}
 	}
 	return exp, nil
-}
-func (tkn Tokens) expression() (Exp, error) {
-	return tkn.list()
 }
 func (tkn Tokens) asignment() (Exp, error) {
 	exp, err := tkn.logicOr()
@@ -1173,7 +1184,48 @@ func (tkn Tokens) unary() (Exp, error) {
 		}
 		return unary{operator: op, right: uexp}, nil
 	}
-	return tkn.primary()
+	return tkn.call()
+}
+func (tkn Tokens) call() (Exp, error) {
+	callee, err := tkn.primary()
+	opsToMatch := scanner.LEFT_PAREN
+	if err != nil {
+		return nil, err
+	}
+	for {
+		cToken := tkn[current]
+		// find the operator terminal
+		if cToken.Ttype == opsToMatch {
+			//consume operator terminal
+			current++
+			op := cToken
+			if tkn[current].Ttype == scanner.RIGHT_PAREN {
+				//empty
+				callee = call{arrity: 0, callee: callee, operator: op, args: nil}
+				current++
+				continue
+			}
+			//non-empty parameters
+			exp, err := tkn.expression()
+			if err != nil {
+				return nil, err
+			}
+			//TODO: assert max args
+			if tkn[current].Ttype != scanner.RIGHT_PAREN {
+				return nil, fmt.Errorf("Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+			}
+			args := exp
+			list, isListExp := exp.(list)
+			if !isListExp {
+				return nil, fmt.Errorf("Expected a list expression but got something different")
+			}
+			//check function arrity here
+			arrity := len(list.expressions)
+			callee = call{arrity: arrity, callee: callee, operator: op, args: args}
+		}
+		break
+	}
+	return callee, nil
 }
 
 // rule for producing operands
