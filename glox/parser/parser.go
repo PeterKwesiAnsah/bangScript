@@ -27,7 +27,13 @@ type callStack []callDetails
 
 // callStack grows , so do env
 type Callable interface {
-	call(*Stmtsenv, *callStack) error
+	//we create new copies of ...env.Local=map[string]Obj{}
+	// reference of body.env still stays the same and has access to it's parent environment
+	// we are keeping body.env as reference but cleaning the slate anytime we have a function call
+	// x86-64 abi, the same set of cpu registers are used to hold function arguments but are saved first before a function so the caller's state or arguments does not lost and returned back
+	// when the callee returns so perhaps we replicate this behavior
+	//
+	call(*Stmtsenv, *callStack) (Obj, error)
 }
 
 // implements Callable interface and statement
@@ -194,12 +200,24 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
 
 // bind function name to it's value in env. The env will be used for parsing function declarations only.
-func (t funcDef) Execute(env *Stmtsenv) error
+func (t funcDef) Execute(env *Stmtsenv) error {
+
+	bs, isbs := t.body.(blockStmt)
+	if !isbs {
+		return fmt.Errorf("Expected block statement at line %d but got something else", t.name.Line)
+	}
+	if bs.env.Encloser != env {
+		return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
+	}
+	//assert t.body.env.Encloser == env
+	env.Local[t.name.Lexem] = t
+	return nil
+}
 
 // caller calls this
 // what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
 // we make copies of env
-func (t funcDef) call() error
+func (t funcDef) call(*Stmtsenv, *callStack) (Obj, error)
 
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
@@ -935,7 +953,18 @@ func (l list) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return rvalue, nil
 }
-func (t call) Evaluate(env *Stmtsenv) (Obj, error)
+func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
+	//call must call .callee
+	value, err := t.callee.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	function, isCallable := value.(funcDef)
+	if !isCallable {
+		return nil, fmt.Errorf("Can't call expression at line %d", t.operator.Line)
+	}
+	return function.call(nil, nil)
+}
 
 // TODO: grammer for tenary expressions
 // TODO: grammer for grouped expression
@@ -1210,7 +1239,6 @@ func (tkn Tokens) call() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			//TODO: assert max args
 			if tkn[current].Ttype != scanner.RIGHT_PAREN {
 				return nil, fmt.Errorf("Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 			}
@@ -1219,6 +1247,7 @@ func (tkn Tokens) call() (Exp, error) {
 			if !isListExp {
 				return nil, fmt.Errorf("Expected a list expression but got something different")
 			}
+			//TODO: assert max args
 			//check function arrity here
 			arrity := len(list.expressions)
 			callee = call{arrity: arrity, callee: callee, operator: op, args: args}
