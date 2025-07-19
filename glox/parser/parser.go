@@ -33,14 +33,14 @@ type Callable interface {
 	// x86-64 abi, the same set of cpu registers are used to hold function arguments but are saved first before a function so the caller's state or arguments does not lost and returned back
 	// when the callee returns so perhaps we replicate this behavior
 	//
-	call(*Stmtsenv, *callStack) (Obj, error)
+	call(*callStack, *call) (Obj, error)
 }
 
 // implements Callable interface and statement
 // before we call .call() caller must set up the arguments in it's environment
 type funcDef struct {
 	name   *scanner.Token
-	params Exp
+	params []*scanner.Token
 	body   Stmt
 	ret    Stmt
 	arrity int
@@ -137,42 +137,45 @@ type expStmt struct {
 var current int = 0
 
 func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
-	var params Exp = nil
-	arrity := 0
+	//var params Exp = nil
+	//arrity := 0
 	name := tkn[current]
+	params := []*scanner.Token{}
 	if tkn[current].Ttype != scanner.IDENTIFIER {
-		return nil, fmt.Errorf("Expected an identifier but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+		return nil, fmt.Errorf("ParseError: Expected an identifier but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
-		return nil, fmt.Errorf("Expected a left paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+		return nil, fmt.Errorf("ParseError: Expected a left paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	if tkn[current].Ttype != scanner.RIGHT_PAREN {
 		//non-empty parameters
-		exp, err := tkn.expression()
-		if err != nil {
-			return nil, err
+		// tkn[current].tokenType should be Identifier. TODO: assert tokentype against type Identifier
+		params = append(params, tkn[current])
+		current++
+		for {
+			if tkn[current].Ttype == scanner.COMMA {
+				current++
+				params = append(params, tkn[current])
+				current++
+				continue
+			}
+			break
 		}
-		//TODO: assert params args
-		params = exp
-		list, isListExp := exp.(list)
-		if !isListExp {
-			return nil, fmt.Errorf("Expected a list expression but got something different")
-		}
-		//check function arrity here
-		arrity = len(list.expressions)
 	}
 	if tkn[current].Ttype != scanner.RIGHT_PAREN {
-		return nil, fmt.Errorf("Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+		return nil, fmt.Errorf("ParseError: Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
 	if tkn[current].Ttype != scanner.LEFT_BRACE {
-		return nil, fmt.Errorf("Expected a right brace but got EOF at line %d", tkn[current].Line)
+		return nil, fmt.Errorf("ParseError: Expected a left brace but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
+	//local is dynamic and will change between function calls (function is a block statement with a dynamic scope policy)
 	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
 	stmts := []Stmt{}
 	stmt := blockStmt{}
+	current++
 	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
 		stmt, err := tkn.declarations(&inner)
 		//TODO:if stmt is continue/break or any other loop related statement we throw error because loops will now handle parsing it's body
@@ -183,13 +186,13 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		stmts = append(stmts, stmt)
 	}
 	if tkn[current].Ttype != scanner.RIGHT_BRACE {
-		return nil, fmt.Errorf("Expected a right brace but got EOF at line %d", tkn[current].Line)
+		return nil, fmt.Errorf("ParseError: Expected a right brace but got EOF at line %d", tkn[current].Line)
 	}
 	current++
 	stmt.stmts = stmts
 	stmt.env = inner
 	return funcDef{
-		arrity: arrity,
+		arrity: len(params),
 		name:   name,
 		body:   stmt,
 		params: params,
@@ -197,17 +200,17 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 }
 
 // evaluate to "<fn funcname >"
-func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
+//func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
 
-// bind function name to it's value in env. The env will be used for parsing function declarations only.
+// bind function name to it's value in env.
 func (t funcDef) Execute(env *Stmtsenv) error {
 
 	bs, isbs := t.body.(blockStmt)
 	if !isbs {
-		return fmt.Errorf("Expected block statement at line %d but got something else", t.name.Line)
+		return fmt.Errorf("ExecutionError: Expected block statement at line %d but got something else", t.name.Line)
 	}
 	if bs.env.Encloser != env {
-		return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
+		return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
 	}
 	//assert t.body.env.Encloser == env
 	env.Local[t.name.Lexem] = t
@@ -217,7 +220,36 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 // caller calls this
 // what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
 // we make copies of env
-func (t funcDef) call(*Stmtsenv, *callStack) (Obj, error)
+func (t funcDef) call(env *Stmtsenv, callStack *callStack, callInfo *call) (Obj, error) {
+	bs, isBs := t.body.(blockStmt)
+	if !isBs {
+		return nil, fmt.Errorf("function body needs to a block statement")
+	}
+	//this is what we need to save between successive function calls
+	envWithFunctionArgsOnly := map[string]Obj{}
+	if callInfo.args != nil {
+		listArgs, isArgs := callInfo.args.(list)
+		if isArgs {
+			for argI, exp := range listArgs.expressions {
+				value, err := exp.Evaluate(env)
+				if err != nil {
+					return nil, err
+				}
+				envWithFunctionArgsOnly[t.params[argI].Lexem] = value
+			}
+		} else {
+			value, err := callInfo.args.Evaluate(env)
+			if err != nil {
+				return nil, err
+			}
+			envWithFunctionArgsOnly[t.params[0].Lexem] = value
+		}
+	}
+
+	bs.env.Local = envWithFunctionArgsOnly
+	//TODO: handle returns
+	return nil, bs.Execute(nil)
+}
 
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
@@ -469,7 +501,7 @@ func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 		stmts = append(stmts, stmt)
 	}
 	if tkn[current].Ttype != scanner.RIGHT_BRACE {
-		return nil, fmt.Errorf("Expected a right brace but got EOF at line %d", tkn[current].Line)
+		return nil, fmt.Errorf("ParseError: Expected a right brace but got EOF at line %d", tkn[current].Line)
 	}
 	current++
 	stmt.stmts = stmts
@@ -482,6 +514,8 @@ func (t printStmt) Execute(env *Stmtsenv) error {
 	if err != nil {
 		return err
 	}
+	//check if Obj is a funcDef, if true we call .Evaluate on it again
+	//TODO:function def don't evaluate to simple scalar values like integer,bool etc it evaluates to a struct which won't print nicely
 	fmt.Printf("%v\n", Obj)
 	return nil
 }
@@ -954,7 +988,6 @@ func (l list) Evaluate(env *Stmtsenv) (Obj, error) {
 	return rvalue, nil
 }
 func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
-	//call must call .callee
 	value, err := t.callee.Evaluate(env)
 	if err != nil {
 		return nil, err
@@ -963,7 +996,10 @@ func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
 	if !isCallable {
 		return nil, fmt.Errorf("Can't call expression at line %d", t.operator.Line)
 	}
-	return function.call(nil, nil)
+	if t.arrity != function.arrity {
+		return nil, fmt.Errorf("Expected %d arguments but got %d instead", function.arrity, t.arrity)
+	}
+	return function.call(env, nil, &t)
 }
 
 // TODO: grammer for tenary expressions
@@ -973,6 +1009,7 @@ func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
 // Rule for parsing expressions into trees
 
 func (tkn Tokens) expression() (Exp, error) {
+	//
 	return tkn.list()
 }
 func (tkn Tokens) list() (Exp, error) {
@@ -1235,22 +1272,23 @@ func (tkn Tokens) call() (Exp, error) {
 				continue
 			}
 			//non-empty parameters
-			exp, err := tkn.expression()
+			exp, err := tkn.list()
 			if err != nil {
 				return nil, err
 			}
 			if tkn[current].Ttype != scanner.RIGHT_PAREN {
-				return nil, fmt.Errorf("Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+				return nil, fmt.Errorf("ParseError: Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 			}
 			args := exp
 			list, isListExp := exp.(list)
-			if !isListExp {
-				return nil, fmt.Errorf("Expected a list expression but got something different")
-			}
 			//TODO: assert max args
-			//check function arrity here
-			arrity := len(list.expressions)
+			//TODO:check function arrity here
+			arrity := 1
+			if isListExp {
+				arrity = len(list.expressions)
+			}
 			callee = call{arrity: arrity, callee: callee, operator: op, args: args}
+			current++
 		}
 		break
 	}
