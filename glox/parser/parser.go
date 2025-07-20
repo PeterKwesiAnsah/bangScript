@@ -113,12 +113,12 @@ type whileStmt struct {
 	condition Exp
 	body      Stmt
 	init      Stmt
-	env       Stmtsenv
+	env       *Stmtsenv
 }
 
 type blockStmt struct {
 	stmts []Stmt
-	env   Stmtsenv
+	env   *Stmtsenv
 }
 
 type varStmt struct {
@@ -172,7 +172,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		return nil, fmt.Errorf("ParseError: Expected a left brace but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	//local is dynamic and will change between function calls (function is a block statement with a dynamic scope policy)
-	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
+	inner := Stmtsenv{Local: nil, Encloser: env}
 	stmts := []Stmt{}
 	stmt := blockStmt{}
 	current++
@@ -190,7 +190,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	}
 	current++
 	stmt.stmts = stmts
-	stmt.env = inner
+	stmt.env = &inner
 	return funcDef{
 		arrity: len(params),
 		name:   name,
@@ -245,7 +245,6 @@ func (t funcDef) call(env *Stmtsenv, callStack *callStack, callInfo *call) (Obj,
 			envWithFunctionArgsOnly[t.params[0].Lexem] = value
 		}
 	}
-
 	bs.env.Local = envWithFunctionArgsOnly
 	//TODO: handle returns
 	return nil, bs.Execute(nil)
@@ -305,9 +304,9 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		//initializer runs in the same scope as the condition
 		return whileStmt{condition: condition, init: initializer,
 			body: blockStmt{
-				stmts: []Stmt{blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: whileScope}},
-				env:   whileScope,
-			}, env: whileScope}, nil
+				stmts: []Stmt{blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}},
+				env:   &whileScope,
+			}, env: &whileScope}, nil
 	}
 	body, err = tkn.declarations(&whileScope)
 	if err != nil {
@@ -321,16 +320,16 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		return whileStmt{condition: condition, init: initializer, body: blockStmt{
 			//initializer runs in the same scope as the condition
 			stmts: []Stmt{blockStmt{stmts: stmts, env: bs.env}},
-			env:   whileScope,
-		}, env: whileScope}, nil
+			env:   &whileScope,
+		}, env: &whileScope}, nil
 	} else {
 		return whileStmt{condition: condition, init: initializer, body: blockStmt{
 			//initializer runs in the same scope as the condition
 			stmts: []Stmt{
 				blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
-					env: whileScope}},
-			env: whileScope,
-		}, env: whileScope}, nil
+					env: &whileScope}},
+			env: &whileScope,
+		}, env: &whileScope}, nil
 	}
 }
 
@@ -344,7 +343,7 @@ func (t whileStmt) Execute(env *Stmtsenv) error {
 	//return fmt.Errorf("Block statements does not need the caller's env")
 	//}
 	if t.init != nil {
-		executionErr = t.init.Execute(&t.env)
+		executionErr = t.init.Execute(t.env)
 		if executionErr != nil {
 			return executionErr
 		}
@@ -352,7 +351,7 @@ func (t whileStmt) Execute(env *Stmtsenv) error {
 	goto evaluateAndtest
 executeBody:
 	{
-		env := &t.env
+		env := t.env
 		_, isBs := t.body.(blockStmt)
 		_, isWs := t.body.(whileStmt)
 		if isBs || isWs {
@@ -371,7 +370,7 @@ evaluateAndtest:
 	if t.condition == nil {
 		goto executeBody
 	}
-	obj, evalErr := t.condition.Evaluate(&t.env)
+	obj, evalErr := t.condition.Evaluate(t.env)
 	if evalErr != nil {
 		return evalErr
 	}
@@ -400,7 +399,7 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return whileStmt{condition: cond, body: bodyStmt, env: *Encloser}, nil
+	return whileStmt{condition: cond, body: bodyStmt, env: Encloser}, nil
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
@@ -471,6 +470,7 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 	return ifStmt{condition: condexp, thenbody: stmtBody, elsebody: elseStmt}, nil
 }
 
+// env,needs to take from caller when the statement is executing is a funcDef but why now ?? what is different??
 func (t blockStmt) Execute(env *Stmtsenv) error {
 	//if env != nil {
 	//return fmt.Errorf("Block statements does not need the caller's env")
@@ -479,7 +479,7 @@ func (t blockStmt) Execute(env *Stmtsenv) error {
 		if stmt == nil {
 			continue
 		}
-		err := stmt.Execute(&t.env)
+		err := stmt.Execute(t.env)
 		if err != nil {
 			return err
 		}
@@ -487,7 +487,6 @@ func (t blockStmt) Execute(env *Stmtsenv) error {
 	return nil
 }
 
-// first blockStmt in call stack , will be called with the global env and subsequent ones will be wrapped recursively in a linked list
 func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: Encloser}
 	stmts := []Stmt{}
@@ -505,7 +504,7 @@ func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 	}
 	current++
 	stmt.stmts = stmts
-	stmt.env = inner
+	stmt.env = &inner
 	return stmt, nil
 }
 
