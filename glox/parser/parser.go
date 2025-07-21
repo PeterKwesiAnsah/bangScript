@@ -36,6 +36,11 @@ type Callable interface {
 	call(*CallStack, *call) (Obj, error)
 }
 
+type returnStmt struct {
+	//currently we allow returns to exps for now. In the future we change to statment because of closures
+	exp Exp
+}
+
 // implements Callable interface and statement
 // before we call .call() caller must set up the arguments in it's environment
 type funcDef struct {
@@ -137,11 +142,30 @@ type expStmt struct {
 var current int = 0
 var cs CallStack = CallStack{}
 
+func (t returnStmt) Execute(env *Stmtsenv) error {
+	return nil
+}
+func (tkn Tokens) returnStmt() (Stmt, error) {
+	exp, err := tkn.expression()
+	if err != nil {
+		return nil, err
+	}
+	//expect a ";" terminator
+	if tkn[current].Ttype != scanner.SEMICOLON {
+		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+	}
+	current++
+	return returnStmt{
+		exp: exp,
+	}, nil
+}
+
 func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	//var params Exp = nil
 	//arrity := 0
 	name := tkn[current]
 	params := []*scanner.Token{}
+	var funcRet Stmt = nil
 	if tkn[current].Ttype != scanner.IDENTIFIER {
 		return nil, fmt.Errorf("ParseError: Expected an identifier but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
@@ -172,7 +196,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_BRACE {
 		return nil, fmt.Errorf("ParseError: Expected a left brace but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
-	//local is dynamic and will change between function calls (function is a block statement with a dynamic scope policy)
+	//local is dynamic and will change between function calls (function is a block statement with a dynamic env policy)
 	inner := Stmtsenv{Local: nil, Encloser: env}
 	stmts := []Stmt{}
 	stmt := blockStmt{}
@@ -183,7 +207,13 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO:if type of statement is return we break
+		returnStmt, isReturnStmt := stmt.(returnStmt)
+		if isReturnStmt {
+			funcRet = returnStmt
+		}
+		if funcRet != nil {
+			continue
+		}
 		stmts = append(stmts, stmt)
 	}
 	if tkn[current].Ttype != scanner.RIGHT_BRACE {
@@ -192,17 +222,21 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	current++
 	stmt.stmts = stmts
 	stmt.env = &inner
+
+	if funcRet == nil {
+		funcRet = returnStmt{exp: nil}
+	}
 	return funcDef{
 		arrity: len(params),
 		name:   name,
 		body:   stmt,
 		params: params,
+		ret:    funcRet,
 	}, nil
 }
 
 // evaluate to "<fn funcname >"
-//func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
-
+// func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
 // bind function name to it's value in env.
 func (t funcDef) Execute(env *Stmtsenv) error {
 
@@ -252,8 +286,24 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (Obj,
 		at:   callInfo.operator.Line,
 		name: t.name.Lexem,
 	})
-	//TODO: handle returns
-	return nil, bs.Execute(nil)
+
+	err := bs.Execute(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	returnStmt, isReturnStmt := t.ret.(returnStmt)
+	if !isReturnStmt {
+		return nil, fmt.Errorf("Expected a return statement")
+	}
+	if returnStmt.exp == nil {
+		return nil, nil
+	}
+	value, err := returnStmt.exp.Evaluate(bs.env)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
 }
 
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
@@ -634,6 +684,9 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	} else if curT.Ttype == scanner.FUN {
 		current++
 		return tkn.funcDef(Encloser)
+	} else if curT.Ttype == scanner.RETURN {
+		current++
+		return tkn.returnStmt()
 	}
 	//expression statement
 	return tkn.expStmt()
