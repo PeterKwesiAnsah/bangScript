@@ -18,12 +18,12 @@ type Exp interface {
 type Stmt interface {
 	Execute(env *Stmtsenv) error
 }
-type callDetails struct {
+type CallDetails struct {
 	args Exp
 	name string
 	at   int
 }
-type callStack []callDetails
+type CallStack []*CallDetails
 
 // callStack grows , so do env
 type Callable interface {
@@ -33,7 +33,7 @@ type Callable interface {
 	// x86-64 abi, the same set of cpu registers are used to hold function arguments but are saved first before a function so the caller's state or arguments does not lost and returned back
 	// when the callee returns so perhaps we replicate this behavior
 	//
-	call(*callStack, *call) (Obj, error)
+	call(*CallStack, *call) (Obj, error)
 }
 
 // implements Callable interface and statement
@@ -135,6 +135,7 @@ type expStmt struct {
 }
 
 var current int = 0
+var cs CallStack = CallStack{}
 
 func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	//var params Exp = nil
@@ -220,7 +221,7 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 // caller calls this
 // what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
 // we make copies of env
-func (t funcDef) call(env *Stmtsenv, callStack *callStack, callInfo *call) (Obj, error) {
+func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (Obj, error) {
 	bs, isBs := t.body.(blockStmt)
 	if !isBs {
 		return nil, fmt.Errorf("function body needs to a block statement")
@@ -246,6 +247,11 @@ func (t funcDef) call(env *Stmtsenv, callStack *callStack, callInfo *call) (Obj,
 		}
 	}
 	bs.env.Local = envWithFunctionArgsOnly
+	cs = append(cs, &CallDetails{
+		args: callInfo.args,
+		at:   callInfo.operator.Line,
+		name: t.name.Lexem,
+	})
 	//TODO: handle returns
 	return nil, bs.Execute(nil)
 }
