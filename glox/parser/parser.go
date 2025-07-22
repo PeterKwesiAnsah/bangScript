@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+// statements that carry their own env, whileStmt,blockStmt
 type Tokens []*scanner.Token
 type Obj interface{}
 
@@ -114,14 +115,14 @@ type ifStmt struct {
 	thenbody  Stmt
 	elsebody  Stmt
 }
-type whileStmt struct {
+type WhileStmt struct {
 	condition Exp
 	body      Stmt
 	init      Stmt
 	env       *Stmtsenv
 }
 
-type blockStmt struct {
+type BlockStmt struct {
 	stmts []Stmt
 	env   *Stmtsenv
 }
@@ -197,9 +198,9 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		return nil, fmt.Errorf("ParseError: Expected a left brace but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	//local is dynamic and will change between function calls (function is a block statement with a dynamic env policy)
-	inner := Stmtsenv{Local: nil, Encloser: env}
+	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
 	stmts := []Stmt{}
-	stmt := blockStmt{}
+	stmt := BlockStmt{}
 	current++
 	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
 		stmt, err := tkn.declarations(&inner)
@@ -240,7 +241,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 // bind function name to it's value in env.
 func (t funcDef) Execute(env *Stmtsenv) error {
 
-	bs, isbs := t.body.(blockStmt)
+	bs, isbs := t.body.(BlockStmt)
 	if !isbs {
 		return fmt.Errorf("ExecutionError: Expected block statement at line %d but got something else", t.name.Line)
 	}
@@ -256,12 +257,15 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 // what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
 // we make copies of env
 func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (Obj, error) {
-	bs, isBs := t.body.(blockStmt)
+	bs, isBs := t.body.(BlockStmt)
 	if !isBs {
 		return nil, fmt.Errorf("function body needs to a block statement")
 	}
+	//bs.env need to be a complete copy
+	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.env.Encloser}
+	bs.env = &newEnv
 	//this is what we need to save between successive function calls
-	envWithFunctionArgsOnly := map[string]Obj{}
+	envWithFunctionArgsOnly := newEnv.Local
 	if callInfo.args != nil {
 		listArgs, isArgs := callInfo.args.(list)
 		if isArgs {
@@ -280,13 +284,16 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (Obj,
 			envWithFunctionArgsOnly[t.params[0].Lexem] = value
 		}
 	}
-	bs.env.Local = envWithFunctionArgsOnly
 	cs = append(cs, &CallDetails{
 		args: callInfo.args,
 		at:   callInfo.operator.Line,
 		name: t.name.Lexem,
 	})
-
+	//the reason why we pass nil is that , we have already created the environments during parsing and each block has it
+	// what we make fresh copies of environment during function calls, and update subsequent environments in the function as they too are dynamic
+	//nil means we still using a static environment
+	//otherwise means we are using a dynamic environment
+	// meaning any blocks/statements with their environment or that carry their on environment will be updated during runtime if they find themselves defined in a funcDef
 	err := bs.Execute(nil)
 	if err != nil {
 		return nil, err
@@ -358,9 +365,9 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	// empty body
 	if tkn[current].Ttype == scanner.SEMICOLON {
 		//initializer runs in the same scope as the condition
-		return whileStmt{condition: condition, init: initializer,
-			body: blockStmt{
-				stmts: []Stmt{blockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}},
+		return WhileStmt{condition: condition, init: initializer,
+			body: BlockStmt{
+				stmts: []Stmt{BlockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}},
 				env:   &whileScope,
 			}, env: &whileScope}, nil
 	}
@@ -368,21 +375,21 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	bs, isBS := body.(blockStmt)
+	bs, isBS := body.(BlockStmt)
 	if isBS {
 		stmts := bs.stmts
 		stmts = append(stmts, expStmt{exp: sideEffect})
 		//we should expect a scope already created
-		return whileStmt{condition: condition, init: initializer, body: blockStmt{
+		return WhileStmt{condition: condition, init: initializer, body: BlockStmt{
 			//initializer runs in the same scope as the condition
-			stmts: []Stmt{blockStmt{stmts: stmts, env: bs.env}},
+			stmts: []Stmt{BlockStmt{stmts: stmts, env: bs.env}},
 			env:   &whileScope,
 		}, env: &whileScope}, nil
 	} else {
-		return whileStmt{condition: condition, init: initializer, body: blockStmt{
+		return WhileStmt{condition: condition, init: initializer, body: BlockStmt{
 			//initializer runs in the same scope as the condition
 			stmts: []Stmt{
-				blockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
+				BlockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
 					env: &whileScope}},
 			env: &whileScope,
 		}, env: &whileScope}, nil
@@ -391,7 +398,9 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 
 // while statement needs it own env
 // TODO: implements loop keyword like continue,break
-func (t whileStmt) Execute(env *Stmtsenv) error {
+func (t WhileStmt) Execute(env *Stmtsenv) error {
+	//if env==nil, static environment body defined outside of a function
+	// otherwise body is defined in a function
 	var executionErr error
 	var evalErr error
 	//env should be nil
@@ -407,15 +416,20 @@ func (t whileStmt) Execute(env *Stmtsenv) error {
 	goto evaluateAndtest
 executeBody:
 	{
-		env := t.env
-		_, isBs := t.body.(blockStmt)
-		_, isWs := t.body.(whileStmt)
-		if isBs || isWs {
-			//block statement/while have their own environment
-			env = nil
+		if t.body == nil {
+			goto evaluateAndtest
 		}
-		executionErr = t.body.Execute(env)
-		//TODO: body can be nil
+		switch s := t.body.(type) {
+		case WhileStmt:
+			s.env.Encloser = t.env
+			executionErr = t.body.Execute(nil)
+		case BlockStmt:
+			s.env.Encloser = t.env
+			executionErr = t.body.Execute(nil)
+		default:
+			//for statements that have their own env,statement.Env you will be executed with nil
+			executionErr = t.body.Execute(t.env)
+		}
 		if executionErr != nil {
 			return executionErr
 		}
@@ -455,7 +469,7 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return whileStmt{condition: cond, body: bodyStmt, env: Encloser}, nil
+	return WhileStmt{condition: cond, body: bodyStmt, env: Encloser}, nil
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
@@ -467,14 +481,17 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 	isTruth := isTruthy(obj)
 
 	if isTruth {
-		env := env
-		_, isBs := t.thenbody.(blockStmt)
-		_, isWs := t.thenbody.(whileStmt)
-		if isBs || isWs {
-			//block or while statement have their own environment
-			env = nil
+		switch s := t.thenbody.(type) {
+		case WhileStmt:
+			s.env.Encloser = env
+			err = t.thenbody.Execute(nil)
+		case BlockStmt:
+			s.env.Encloser = env
+			err = t.thenbody.Execute(nil)
+		default:
+			//for statements that have their own env,statement.Env you will be executed with nil
+			err = t.thenbody.Execute(env)
 		}
-		err := t.thenbody.Execute(env)
 		if err != nil {
 			return err
 		}
@@ -482,14 +499,17 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 		if t.elsebody == nil {
 			return nil
 		}
-		env := env
-		_, isBs := t.elsebody.(blockStmt)
-		_, isWs := t.elsebody.(whileStmt)
-		if isBs || isWs {
-			//block or while statement have their own environment
-			env = nil
+		switch s := t.elsebody.(type) {
+		case WhileStmt:
+			s.env.Encloser = env
+			err = t.elsebody.Execute(nil)
+		case BlockStmt:
+			s.env.Encloser = env
+			err = t.elsebody.Execute(nil)
+		default:
+			//for statements that have their own env,statement.Env you will be executed with nil
+			err = t.elsebody.Execute(env)
 		}
-		err := t.elsebody.Execute(env)
 		if err != nil {
 			return err
 		}
@@ -526,16 +546,31 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 	return ifStmt{condition: condexp, thenbody: stmtBody, elsebody: elseStmt}, nil
 }
 
-// env,needs to take from caller when the statement is executing is a funcDef but why now ?? what is different??
-func (t blockStmt) Execute(env *Stmtsenv) error {
-	//if env != nil {
-	//return fmt.Errorf("Block statements does not need the caller's env")
-	//}
+func (t BlockStmt) Execute(env *Stmtsenv) error {
+	// 	//if env==nil, static environment body defined outside of a function
+	// otherwise body is defined in a function
 	for _, stmt := range t.stmts {
 		if stmt == nil {
 			continue
 		}
-		err := stmt.Execute(t.env)
+		//for dynamic environment env != nil, and the rest of the statements need to execute with the env
+		// if env!=nil, every other statement will be run with this env, and if you carry your own environment
+		// your encloser will be updated with this env and you will be Executed with nil as you carry your own env
+		//
+		var err error
+		switch s := stmt.(type) {
+		case WhileStmt:
+			///if s.env.Encloser != t.env , t.env is dynamic.
+			s.env.Encloser = t.env
+			err = stmt.Execute(nil)
+		case BlockStmt:
+			///if s.env.Encloser != t.env , t.env is dynamic.
+			s.env.Encloser = t.env
+			err = stmt.Execute(nil)
+		default:
+			//for statements that have their own env,statement.Env you will be executed with nil
+			err = stmt.Execute(t.env)
+		}
 		if err != nil {
 			return err
 		}
@@ -546,7 +581,7 @@ func (t blockStmt) Execute(env *Stmtsenv) error {
 func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: Encloser}
 	stmts := []Stmt{}
-	stmt := blockStmt{}
+	stmt := BlockStmt{}
 	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
 		stmt, err := tkn.declarations(&inner)
 		// if stmt is continue/break/return or any other loop related statement we throw error because loops will now handle parsing it's body
@@ -1057,6 +1092,7 @@ func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
 	if t.arrity != function.arrity {
 		return nil, fmt.Errorf("Expected %d arguments but got %d instead", function.arrity, t.arrity)
 	}
+	//env is a parent environment can be immediate env or global
 	return function.call(env, nil, &t)
 }
 
