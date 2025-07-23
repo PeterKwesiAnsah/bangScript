@@ -48,7 +48,7 @@ type funcDef struct {
 	name   *scanner.Token
 	params []*scanner.Token
 	body   Stmt
-	ret    Stmt
+	//ret    Stmt
 	arrity int
 }
 
@@ -144,7 +144,11 @@ var current int = 0
 var cs CallStack = CallStack{}
 
 func (t returnStmt) Execute(env *Stmtsenv) error {
-	return nil
+	value, err := t.exp.Evaluate(env)
+	if err != nil {
+		return err
+	}
+	panic(value)
 }
 func (tkn Tokens) returnStmt() (Stmt, error) {
 	exp, err := tkn.expression()
@@ -166,7 +170,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	//arrity := 0
 	name := tkn[current]
 	params := []*scanner.Token{}
-	var funcRet Stmt = nil
+
 	if tkn[current].Ttype != scanner.IDENTIFIER {
 		return nil, fmt.Errorf("ParseError: Expected an identifier but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
@@ -208,13 +212,6 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		returnStmt, isReturnStmt := stmt.(returnStmt)
-		if isReturnStmt {
-			funcRet = returnStmt
-		}
-		if funcRet != nil {
-			continue
-		}
 		stmts = append(stmts, stmt)
 	}
 	if tkn[current].Ttype != scanner.RIGHT_BRACE {
@@ -224,15 +221,11 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	stmt.stmts = stmts
 	stmt.env = &inner
 
-	if funcRet == nil {
-		funcRet = returnStmt{exp: nil}
-	}
 	return funcDef{
 		arrity: len(params),
 		name:   name,
 		body:   stmt,
 		params: params,
-		ret:    funcRet,
 	}, nil
 }
 
@@ -256,11 +249,17 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 // caller calls this
 // what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
 // we make copies of env
-func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (Obj, error) {
+// TODO: handle returns , functions can have returns nested in any part of their body
+func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (value Obj, err error) {
 	bs, isBs := t.body.(BlockStmt)
 	if !isBs {
 		return nil, fmt.Errorf("function body needs to a block statement")
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			value = r
+		}
+	}()
 	//bs.env need to be a complete copy
 	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.env.Encloser}
 	bs.env = &newEnv
@@ -294,22 +293,23 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (Obj,
 	//nil means we still using a static environment
 	//otherwise means we are using a dynamic environment
 	// meaning any blocks/statements with their environment or that carry their on environment will be updated during runtime if they find themselves defined in a funcDef
-	err := bs.Execute(nil)
+	//TODO: treat returns like errors
+	err = bs.Execute(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	returnStmt, isReturnStmt := t.ret.(returnStmt)
-	if !isReturnStmt {
-		return nil, fmt.Errorf("Expected a return statement")
-	}
-	if returnStmt.exp == nil {
-		return nil, nil
-	}
-	value, err := returnStmt.exp.Evaluate(bs.env)
-	if err != nil {
-		return nil, err
-	}
+	//returnStmt, isReturnStmt := t.ret.(returnStmt)
+	//if !isReturnStmt {
+	//return nil, fmt.Errorf("Expected a return statement")
+	//}
+	//if returnStmt.exp == nil {
+	//return nil, nil
+	//}
+	//value, err := returnStmt.exp.Evaluate(bs.env)
+	//if err != nil {
+	//return nil, err
+	//}
 	return value, nil
 }
 
@@ -408,6 +408,7 @@ func (t WhileStmt) Execute(env *Stmtsenv) error {
 	//return fmt.Errorf("Block statements does not need the caller's env")
 	//}
 	if t.init != nil {
+		//init is neither a while stmt or a block stmt
 		executionErr = t.init.Execute(t.env)
 		if executionErr != nil {
 			return executionErr
