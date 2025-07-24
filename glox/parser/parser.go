@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-// statements that carry their own env, whileStmt,blockStmt
+// statements that carry their own env, whileStmt,blockStmt,funDef (but through their body)
 type Tokens []*scanner.Token
 type Obj interface{}
 
@@ -115,9 +115,12 @@ type ifStmt struct {
 	thenbody  Stmt
 	elsebody  Stmt
 }
+type forStmt struct {
+	stmt WhileStmt
+}
 type WhileStmt struct {
 	condition Exp
-	body      Stmt
+	body      BlockStmt
 	init      Stmt
 	env       *Stmtsenv
 }
@@ -313,6 +316,11 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	return value, nil
 }
 
+func (t forStmt) Execute(env *Stmtsenv) error {
+	t.stmt.env.Encloser = env
+	return t.stmt.Execute(nil)
+}
+
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var initializer Stmt = nil
@@ -365,11 +373,11 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	// empty body
 	if tkn[current].Ttype == scanner.SEMICOLON {
 		//initializer runs in the same scope as the condition
-		return WhileStmt{condition: condition, init: initializer,
+		return forStmt{stmt: WhileStmt{condition: condition, init: initializer,
 			body: BlockStmt{
 				stmts: []Stmt{BlockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}},
 				env:   &whileScope,
-			}, env: &whileScope}, nil
+			}, env: &whileScope}}, nil
 	}
 	body, err = tkn.declarations(&whileScope)
 	if err != nil {
@@ -380,19 +388,19 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		stmts := bs.stmts
 		stmts = append(stmts, expStmt{exp: sideEffect})
 		//we should expect a scope already created
-		return WhileStmt{condition: condition, init: initializer, body: BlockStmt{
+		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, body: BlockStmt{
 			//initializer runs in the same scope as the condition
 			stmts: []Stmt{BlockStmt{stmts: stmts, env: bs.env}},
 			env:   &whileScope,
-		}, env: &whileScope}, nil
+		}, env: &whileScope}}, nil
 	} else {
-		return WhileStmt{condition: condition, init: initializer, body: BlockStmt{
+		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, body: BlockStmt{
 			//initializer runs in the same scope as the condition
 			stmts: []Stmt{
 				BlockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
 					env: &whileScope}},
 			env: &whileScope,
-		}, env: &whileScope}, nil
+		}, env: &whileScope}}, nil
 	}
 }
 
@@ -417,20 +425,21 @@ func (t WhileStmt) Execute(env *Stmtsenv) error {
 	goto evaluateAndtest
 executeBody:
 	{
-		if t.body == nil {
+		body := t.body.stmts[0]
+		if body == nil {
 			goto evaluateAndtest
 		}
-		switch s := t.body.(type) {
-		case WhileStmt:
-			s.env.Encloser = t.env
-			executionErr = t.body.Execute(nil)
-		case BlockStmt:
-			s.env.Encloser = t.env
-			executionErr = t.body.Execute(nil)
-		default:
-			//for statements that have their own env,statement.Env you will be executed with nil
-			executionErr = t.body.Execute(t.env)
+		bs, isbs := body.(BlockStmt)
+		if !isbs {
+			return fmt.Errorf("Not block")
 		}
+		//TODO:assert bs.env==t.env, throw error if otherwise , only block statments in a while statement can have the same env as it's parent
+		//bs.env and t.env are not aliases, otherwise we would create an infinite loop
+		if bs.env != t.env {
+			bs.env.Encloser = t.env
+		}
+		executionErr = t.body.Execute(nil)
+
 		if executionErr != nil {
 			return executionErr
 		}
@@ -467,10 +476,14 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	current++
 	//TODO: use tkn.statement()
 	bodyStmt, err := tkn.declarations(Encloser)
+	bs, isBs := bodyStmt.(BlockStmt)
+	if !isBs {
+		return nil, fmt.Errorf("Expected a block statement")
+	}
 	if err != nil {
 		return nil, err
 	}
-	return WhileStmt{condition: cond, body: bodyStmt, env: Encloser}, nil
+	return WhileStmt{condition: cond, body: bs, env: Encloser}, nil
 }
 
 func (t ifStmt) Execute(env *Stmtsenv) error {
