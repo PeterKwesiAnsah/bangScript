@@ -48,7 +48,6 @@ type funcDef struct {
 	name   *scanner.Token
 	params []*scanner.Token
 	body   Stmt
-	//ret    Stmt
 	arrity int
 }
 
@@ -169,8 +168,6 @@ func (tkn Tokens) returnStmt() (Stmt, error) {
 }
 
 func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
-	//var params Exp = nil
-	//arrity := 0
 	name := tkn[current]
 	params := []*scanner.Token{}
 
@@ -204,7 +201,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_BRACE {
 		return nil, fmt.Errorf("ParseError: Expected a left brace but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
-	//local is dynamic and will change between function calls (function is a block statement with a dynamic env policy)
+
 	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
 	stmts := []Stmt{}
 	stmt := BlockStmt{}
@@ -236,7 +233,6 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 // func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
 // bind function name to it's value in env.
 func (t funcDef) Execute(env *Stmtsenv) error {
-
 	bs, isbs := t.body.(BlockStmt)
 	if !isbs {
 		return fmt.Errorf("ExecutionError: Expected block statement at line %d but got something else", t.name.Line)
@@ -244,15 +240,10 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 	if bs.env.Encloser != env {
 		return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
 	}
-	//assert t.body.env.Encloser == env
 	env.Local[t.name.Lexem] = t
 	return nil
 }
 
-// caller calls this
-// what happens if a function define in an outer scope, is called with an env, which is enclosed by the caller's env
-// we make copies of env
-// TODO: handle returns , functions can have returns nested in any part of their body
 func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (value Obj, err error) {
 	bs, isBs := t.body.(BlockStmt)
 	if !isBs {
@@ -263,10 +254,10 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 			value = r
 		}
 	}()
-	//bs.env need to be a complete copy
+	//bs.env need to be a complete copy, since it's new any environment that once enclosed around bs.env will be updated
 	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.env.Encloser}
 	bs.env = &newEnv
-	//this is what we need to save between successive function calls
+
 	envWithFunctionArgsOnly := newEnv.Local
 	if callInfo.args != nil {
 		listArgs, isArgs := callInfo.args.(list)
@@ -293,26 +284,11 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	})
 	//the reason why we pass nil is that , we have already created the environments during parsing and each block has it
 	// what we make fresh copies of environment during function calls, and update subsequent environments in the function as they too are dynamic
-	//nil means we still using a static environment
-	//otherwise means we are using a dynamic environment
-	// meaning any blocks/statements with their environment or that carry their on environment will be updated during runtime if they find themselves defined in a funcDef
-	//TODO: treat returns like errors
+
 	err = bs.Execute(nil)
 	if err != nil {
 		return nil, err
 	}
-
-	//returnStmt, isReturnStmt := t.ret.(returnStmt)
-	//if !isReturnStmt {
-	//return nil, fmt.Errorf("Expected a return statement")
-	//}
-	//if returnStmt.exp == nil {
-	//return nil, nil
-	//}
-	//value, err := returnStmt.exp.Evaluate(bs.env)
-	//if err != nil {
-	//return nil, err
-	//}
 	return value, nil
 }
 
@@ -404,17 +380,14 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	}
 }
 
-// while statement needs it own env
 // TODO: implements loop keyword like continue,break
 func (t WhileStmt) Execute(env *Stmtsenv) error {
-	//if env==nil, static environment body defined outside of a function
-	// otherwise body is defined in a function
 	var executionErr error
 	var evalErr error
 	//env should be nil
-	//if env != nil {
-	//return fmt.Errorf("Block statements does not need the caller's env")
-	//}
+	if env != nil {
+		return fmt.Errorf("Block statements does not need the caller's env")
+	}
 	if t.init != nil {
 		//init is neither a while stmt or a block stmt
 		executionErr = t.init.Execute(t.env)
@@ -495,15 +468,22 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 	isTruth := isTruthy(obj)
 
 	if isTruth {
+		//these are statements that need their environment updated
 		switch s := t.thenbody.(type) {
 		case WhileStmt:
+			if s.env == env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
 			s.env.Encloser = env
 			err = t.thenbody.Execute(nil)
 		case BlockStmt:
+			if s.env == env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
 			s.env.Encloser = env
 			err = t.thenbody.Execute(nil)
+		case funcDef:
 		default:
-			//for statements that have their own env,statement.Env you will be executed with nil
 			err = t.thenbody.Execute(env)
 		}
 		if err != nil {
@@ -515,11 +495,18 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 		}
 		switch s := t.elsebody.(type) {
 		case WhileStmt:
+			if s.env == env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
 			s.env.Encloser = env
 			err = t.elsebody.Execute(nil)
 		case BlockStmt:
+			if s.env == env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
 			s.env.Encloser = env
 			err = t.elsebody.Execute(nil)
+		case funcDef:
 		default:
 			//for statements that have their own env,statement.Env you will be executed with nil
 			err = t.elsebody.Execute(env)
@@ -574,10 +561,16 @@ func (t BlockStmt) Execute(env *Stmtsenv) error {
 		var err error
 		switch s := stmt.(type) {
 		case WhileStmt:
+			if s.env == t.env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
 			///if s.env.Encloser != t.env , t.env is dynamic.
 			s.env.Encloser = t.env
 			err = stmt.Execute(nil)
 		case BlockStmt:
+			if s.env == t.env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
 			///if s.env.Encloser != t.env , t.env is dynamic.
 			s.env.Encloser = t.env
 			err = stmt.Execute(nil)
