@@ -470,7 +470,7 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
 			//This means, from top to bottom we are replacing all static env during function calls
-			// TODO: do this for only func calls
+			// TODO: do this for only func call
 			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			s.env.Encloser = env
 			err = s.Execute(nil)
@@ -1162,6 +1162,8 @@ func (tkn Tokens) list() (Exp, error) {
 	}
 	return exp, nil
 }
+
+// TODO: add right associative parsing
 func (tkn Tokens) asignment() (Exp, error) {
 	exp, err := tkn.logicOr()
 	if err != nil {
@@ -1211,7 +1213,7 @@ Matching_Loop:
 					return nil, err
 				}
 				expleft = logicalOr{left: expleft, operator: op, right: expright}
-				break Matching_Loop
+				continue Matching_Loop
 			}
 		}
 		break
@@ -1240,7 +1242,7 @@ Matching_Loop:
 					return nil, err
 				}
 				expleft = logicalAnd{left: expleft, operator: op, right: expright}
-				break Matching_Loop
+				continue Matching_Loop
 			}
 		}
 		break
@@ -1295,7 +1297,7 @@ Matching_Loop:
 					return nil, err
 				}
 				texpleft = binary{left: texpleft, operator: op, right: texpright}
-				break Matching_Loop
+				continue Matching_Loop
 			}
 		}
 		break
@@ -1325,7 +1327,7 @@ Matching_Loop:
 					return nil, err
 				}
 				fexpleft = binary{left: fexpleft, operator: op, right: fexpright}
-				break Matching_Loop
+				continue Matching_Loop
 			}
 		}
 		break
@@ -1357,7 +1359,7 @@ Matching_Loop:
 					return nil, err
 				}
 				uexpleft = binary{left: uexpleft, operator: op, right: fexpright}
-				break Matching_Loop
+				continue Matching_Loop
 			}
 		}
 		break
@@ -1384,6 +1386,7 @@ func (tkn Tokens) call() (Exp, error) {
 	if err != nil {
 		return nil, err
 	}
+Matching_Loop:
 	for {
 		cToken := tkn[current]
 		// find the operator terminal
@@ -1415,6 +1418,7 @@ func (tkn Tokens) call() (Exp, error) {
 			}
 			callee = call{arrity: arrity, callee: callee, operator: op, args: args}
 			current++
+			continue Matching_Loop
 		}
 		break
 	}
