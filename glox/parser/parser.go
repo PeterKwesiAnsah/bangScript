@@ -47,7 +47,7 @@ type returnStmt struct {
 type funcDef struct {
 	name   *scanner.Token
 	params []*scanner.Token
-	body   Stmt
+	body   BlockStmt
 	arrity int
 }
 
@@ -233,10 +233,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 // func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
 // bind function name to it's value in env.
 func (t funcDef) Execute(env *Stmtsenv) error {
-	bs, isbs := t.body.(BlockStmt)
-	if !isbs {
-		return fmt.Errorf("ExecutionError: Expected block statement at line %d but got something else", t.name.Line)
-	}
+	bs := t.body
 	if bs.env.Encloser != env {
 		return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
 	}
@@ -245,10 +242,8 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 }
 
 func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (value Obj, err error) {
-	bs, isBs := t.body.(BlockStmt)
-	if !isBs {
-		return nil, fmt.Errorf("function body needs to a block statement")
-	}
+	bs := t.body
+
 	defer func() {
 		if r := recover(); r != nil {
 			value = r
@@ -468,23 +463,35 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 	isTruth := isTruthy(obj)
 
 	if isTruth {
-		//these are statements that need their environment updated
+		//these are statements that need their environment updated becuase they either carry own env or have nodes that carry their own env
 		switch s := t.thenbody.(type) {
 		case WhileStmt:
 			if s.env == env {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
+			//This means, from top to bottom we are replacing all static env during function calls
+			// TODO: do this for only func calls
+			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			s.env.Encloser = env
-			err = t.thenbody.Execute(nil)
+			err = s.Execute(nil)
 		case BlockStmt:
 			if s.env == env {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
+			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			s.env.Encloser = env
-			err = t.thenbody.Execute(nil)
+			err = s.Execute(nil)
 		case funcDef:
+			if s.body.env == env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
+			s.body.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
+			s.body.env.Encloser = env
+			//TODO: for now we pass env, later we will  pass nil as functions are just block statements with dynamic env
+			err = s.Execute(env)
+		//case returnStmt:
 		default:
-			err = t.thenbody.Execute(env)
+			err = s.Execute(env)
 		}
 		if err != nil {
 			return err
@@ -493,23 +500,34 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 		if t.elsebody == nil {
 			return nil
 		}
+		//these are statements that need their environment updated
 		switch s := t.elsebody.(type) {
 		case WhileStmt:
 			if s.env == env {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
+			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			s.env.Encloser = env
-			err = t.elsebody.Execute(nil)
+			err = s.Execute(nil)
 		case BlockStmt:
 			if s.env == env {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
+			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			s.env.Encloser = env
-			err = t.elsebody.Execute(nil)
+			err = s.Execute(nil)
 		case funcDef:
+			if s.body.env == env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
+			s.body.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
+			s.body.env.Encloser = env
+			//TODO: for now we pass env, later we will  pass nil as functions are just block statements with dynamic env
+			err = s.Execute(env)
+		//case returnStmt:
 		default:
 			//for statements that have their own env,statement.Env you will be executed with nil
-			err = t.elsebody.Execute(env)
+			err = s.Execute(env)
 		}
 		if err != nil {
 			return err
@@ -548,35 +566,42 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 }
 
 func (t BlockStmt) Execute(env *Stmtsenv) error {
-	// 	//if env==nil, static environment body defined outside of a function
-	// otherwise body is defined in a function
+
 	for _, stmt := range t.stmts {
 		if stmt == nil {
 			continue
 		}
-		//for dynamic environment env != nil, and the rest of the statements need to execute with the env
-		// if env!=nil, every other statement will be run with this env, and if you carry your own environment
-		// your encloser will be updated with this env and you will be Executed with nil as you carry your own env
-		//
+		//functions have dynamic environment,created when they are called as such nested environments should be updated to enclose around this new env before they are executed
 		var err error
 		switch s := stmt.(type) {
 		case WhileStmt:
 			if s.env == t.env {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
+			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			///if s.env.Encloser != t.env , t.env is dynamic.
 			s.env.Encloser = t.env
-			err = stmt.Execute(nil)
+			err = s.Execute(nil)
 		case BlockStmt:
 			if s.env == t.env {
 				return fmt.Errorf("Child environment can not be the same as Parent")
 			}
+			s.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
 			///if s.env.Encloser != t.env , t.env is dynamic.
 			s.env.Encloser = t.env
-			err = stmt.Execute(nil)
+			err = s.Execute(nil)
+		case funcDef:
+			if s.body.env == t.env {
+				return fmt.Errorf("Child environment can not be the same as Parent")
+			}
+			s.body.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: nil}
+			s.body.env.Encloser = t.env
+			//TODO: for now we pass env, later we will  pass nil as functions are just block statements with dynamic env
+			err = s.Execute(t.env)
+		//case returnStmt:
 		default:
 			//for statements that have their own env,statement.Env you will be executed with nil
-			err = stmt.Execute(t.env)
+			err = s.Execute(t.env)
 		}
 		if err != nil {
 			return err
