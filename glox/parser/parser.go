@@ -358,6 +358,7 @@ func (t forStmt) Execute(env *Stmtsenv) error {
 	return t.stmt.Execute(nil)
 }
 
+// TOD0: re-iterate this
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var initializer Stmt = nil
@@ -742,6 +743,8 @@ func (t varStmt) Execute(env *Stmtsenv) error {
 	env.Local[t.name.Lexem] = obj
 	return nil
 }
+
+// TODO: support list identifier expressions and initializing
 func (tkn Tokens) varStmt() (Stmt, error) {
 	stmt := varStmt{}
 	//expect identifier
@@ -757,6 +760,14 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 	if tkn[current].Ttype == scanner.EQUAL {
 		current++
 		//we expect an initializer expresion or what some may call a variable expression
+		exp, err := tkn.expression()
+		if err != nil {
+			return nil, err
+		}
+		stmt.exp = exp
+	}
+	if tkn[current].Ttype == scanner.EQUAL {
+		current++
 		exp, err := tkn.expression()
 		if err != nil {
 			return nil, err
