@@ -35,6 +35,7 @@ type CallDetails struct {
 }
 type CallStack []*CallDetails
 
+// TODO: have a map of scanner token type to string (12 becomes colon)
 // callStack grows , so do env
 type Callable interface {
 	//we create new copies of ...env.Local=map[string]Obj{}
@@ -156,14 +157,23 @@ var current int = 0
 var cs CallStack = CallStack{}
 
 func (t *forStmt) StaticToDynamic(parent *Stmtsenv) error {
+	//t.stmt.env is environment for condition,initializer and single body statement
 	if t.stmt.env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
 	if parent.Policy == DYNAMIC {
-		t.stmt.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
+		//condition,initializer and single body statement
+		newEnv := &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
+		if t.stmt.env == t.stmt.body.env {
+			t.stmt.env = newEnv
+			t.stmt.body.env = newEnv
+		} else {
+			t.stmt.env = newEnv
+			t.stmt.body.StaticToDynamic(newEnv)
+		}
 	} else {
 		if t.stmt.env.Encloser != parent {
-			return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
+			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
 		}
 	}
 
@@ -200,7 +210,15 @@ func (t *WhileStmt) StaticToDynamic(parent *Stmtsenv) error {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
 	if parent.Policy == DYNAMIC {
-		t.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
+		//condition,initializer and single body statement
+		newEnv := &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
+		if t.env == t.body.env {
+			t.env = newEnv
+			t.body.env = newEnv
+		} else {
+			t.env = newEnv
+			t.body.StaticToDynamic(newEnv)
+		}
 	} else {
 		if t.env.Encloser != parent {
 			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
@@ -309,11 +327,21 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	bs := t.body
 
 	defer func() {
+		//TODO: differentiate from runtime panics and lox returns
 		if r := recover(); r != nil {
-			value = r
+			switch s := r.(type) {
+			case float64:
+				value = s
+			case string:
+				value = s
+			case funcDef:
+				value = s
+			default:
+				panic(r)
+			}
 		}
 	}()
-	//add policy?? static or dynamic??
+
 	//bs.env need to be a complete copy, since it's new, any environment that once enclosed around bs.env will be updated to support closures
 	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.env.Encloser, Policy: DYNAMIC}
 	bs.env = &newEnv
@@ -345,7 +373,6 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	//the reason why we pass nil is that , we have already created the environments during parsing and each block has it
 	// what we make fresh copies of environment during function calls, and update subsequent environments in the function as they too are dynamic
 	//dynamic env
-	//1?.
 	err = bs.Execute(nil)
 	if err != nil {
 		return nil, err
@@ -353,12 +380,10 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	return value, nil
 }
 
-// TODO: add to switch statements
-func (t forStmt) Execute(env *Stmtsenv) error {
+func (t forStmt) Execute(parent *Stmtsenv) error {
 	return t.stmt.Execute(nil)
 }
 
-// TOD0: re-iterate this
 // Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var initializer Stmt = nil
@@ -366,7 +391,7 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var sideEffect Exp = nil
 	var body Stmt = nil
 	var err error
-	//create scope for initializer
+	//create scope for initializer and condition
 	whileScope := Stmtsenv{Local: map[string]Obj{}, Encloser: env}
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
 		return nil, fmt.Errorf("Expected left paren after for but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
@@ -379,6 +404,7 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		//automatically consumes the semi-colon token because we are parsing the initializer as a statement (expression statement for assignment/variable decl)
 	} else {
+		//empty initializer (variable declaration/assigment)
 		current++
 	}
 	if tkn[current].Ttype != scanner.SEMICOLON {
@@ -392,6 +418,7 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		current++
 	} else {
+		//empty condition expression
 		current++
 	}
 	if tkn[current].Ttype == scanner.RIGHT_PAREN {
@@ -407,40 +434,26 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		current++
 	}
-
-	// empty body
+	// empty body statement
 	if tkn[current].Ttype == scanner.SEMICOLON {
-		//initializer runs in the same scope as the condition
-		return forStmt{stmt: WhileStmt{condition: condition, init: initializer,
-			body: BlockStmt{
-				stmts: []Stmt{BlockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}},
-				env:   &whileScope,
-			}, env: &whileScope}}, nil
+		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
+			body: BlockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}}}, nil
 	}
 	body, err = tkn.declarations(&whileScope)
 	if err != nil {
 		return nil, err
 	}
+	//block body statement
 	bs, isBS := body.(BlockStmt)
 	if isBS {
 		stmts := bs.stmts
 		stmts = append(stmts, expStmt{exp: sideEffect})
-		//we should expect a scope already created
-		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, body: BlockStmt{
-			//initializer runs in the same scope as the condition
-			stmts: []Stmt{BlockStmt{stmts: stmts, env: bs.env}},
-			//TODO:replace with nil
-			env: &whileScope,
-		}, env: &whileScope}}, nil
+		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope, body: BlockStmt{stmts: stmts, env: bs.env}}}, nil
 	} else {
-		//TODO: test this with nested for loops??
-		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, body: BlockStmt{
-			//initializer runs in the same scope as the condition
-			stmts: []Stmt{
-				BlockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
-					env: &whileScope}},
-			env: &whileScope,
-		}, env: &whileScope}}, nil
+		//single statement body
+		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
+			body: BlockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
+				env: &whileScope}}}, nil
 	}
 }
 
@@ -462,19 +475,7 @@ func (t WhileStmt) Execute(env *Stmtsenv) error {
 	goto evaluateAndtest
 executeBody:
 	{
-		body := t.body.stmts[0]
-		if body == nil {
-			goto evaluateAndtest
-		}
-		bs, isbs := body.(BlockStmt)
-		if !isbs {
-			return fmt.Errorf("Expected BlockStatment but got something else")
-		}
-		executionErr = bs.StaticToDynamic(t.env)
-		if executionErr != nil {
-			return executionErr
-		}
-		//3?.
+		//creating new environment per iteration??
 		executionErr = t.body.Execute(nil)
 		if executionErr != nil {
 			return executionErr
@@ -538,21 +539,18 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 			if err != nil {
 				return err
 			}
-			//4?.
 			err = s.Execute(nil)
 		case BlockStmt:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
 			}
-			//5?.
 			err = s.Execute(nil)
 		case funcDef:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
 			}
-			//6?.
 			err = s.Execute(nil)
 		case forStmt:
 			err = s.StaticToDynamic(env)
@@ -577,21 +575,18 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 			if err != nil {
 				return err
 			}
-			//7?.
 			err = s.Execute(nil)
 		case BlockStmt:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
 			}
-			//8?.
 			err = s.Execute(nil)
 		case funcDef:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
 			}
-			//9?.
 			err = s.Execute(env)
 		case forStmt:
 			err = s.StaticToDynamic(env)
@@ -665,7 +660,6 @@ func (t BlockStmt) Execute(env *Stmtsenv) error {
 			if err != nil {
 				return err
 			}
-			//12?.
 			err = s.Execute(nil)
 		case forStmt:
 			err = s.StaticToDynamic(t.env)
