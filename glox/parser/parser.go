@@ -6,6 +6,10 @@ import (
 	"strconv"
 )
 
+type loxReturn struct {
+	value Obj
+}
+
 const (
 	STATIC uint8 = iota
 	DYNAMIC
@@ -232,7 +236,9 @@ func (t returnStmt) Execute(env *Stmtsenv) error {
 	if err != nil {
 		return err
 	}
-	panic(value)
+	panic(loxReturn{
+		value: value,
+	})
 }
 func (tkn Tokens) returnStmt() (Stmt, error) {
 	exp, err := tkn.expression()
@@ -327,15 +333,10 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	bs := t.body
 
 	defer func() {
-		//TODO: differentiate from runtime panics and lox returns
 		if r := recover(); r != nil {
 			switch s := r.(type) {
-			case float64:
-				value = s
-			case string:
-				value = s
-			case funcDef:
-				value = s
+			case loxReturn:
+				value = s.value
 			default:
 				panic(r)
 			}
