@@ -326,6 +326,7 @@ func (t funcDef) Execute(env *Stmtsenv) error {
 	//return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
 	//}
 	bs.env.Encloser.Local[t.name.Lexem] = t
+	// snapshot bs.env.Encloser
 	return nil
 }
 
@@ -726,50 +727,44 @@ func (tkn Tokens) printStmt() (Stmt, error) {
 }
 
 func (t varStmt) Execute(env *Stmtsenv) error {
-	var obj Obj = nil
+	//var obj Obj = nil
 	//check if variable declaration have a definition
 	if t.exp != nil {
-		var err error
-		obj, err = t.exp.Evaluate(env)
-		if err != nil {
-			return err
+		switch s := t.exp.(type) {
+		case primary:
+			env.Local[s.node.Lexem] = nil
+		case assigment:
+			//for now only primary identifier expressions map to a storage location
+			lv, isStorageTarget := s.storeTarget.(primary)
+			if !(isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER) {
+				return fmt.Errorf("Cannot use the l-value as storage target")
+			}
+			obj, err := s.right.Evaluate(env)
+			if err != nil {
+				return err
+			}
+			env.Local[lv.node.Lexem] = obj
+		case list:
+			for _, exp := range s.expressions {
+				err := varStmt{nil, exp}.Execute(env)
+				if err != nil {
+					return err
+				}
+			}
+		default:
+			return fmt.Errorf("Not Valid expression for variable declaration")
 		}
 	}
-	env.Local[t.name.Lexem] = obj
 	return nil
 }
 
-// TODO: support list identifier expressions and initializing
 func (tkn Tokens) varStmt() (Stmt, error) {
 	stmt := varStmt{}
-	//expect identifier
-	if tkn[current].Ttype != scanner.IDENTIFIER {
-		return nil, fmt.Errorf("Expected an identifier after var but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+	exp, err := tkn.expression()
+	if err != nil {
+		return nil, err
 	}
-	stmt.name = tkn[current]
-	stmt.exp = nil
-
-	//consume identifier
-	current++
-	//optionally expect an initializer
-	if tkn[current].Ttype == scanner.EQUAL {
-		current++
-		//we expect an initializer expresion or what some may call a variable expression
-		exp, err := tkn.expression()
-		if err != nil {
-			return nil, err
-		}
-		stmt.exp = exp
-	}
-	if tkn[current].Ttype == scanner.EQUAL {
-		current++
-		exp, err := tkn.expression()
-		if err != nil {
-			return nil, err
-		}
-		stmt.exp = exp
-	}
-	//expect a ";" terminator
+	stmt.exp = exp
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
@@ -1459,6 +1454,8 @@ func (tkn Tokens) unary() (Exp, error) {
 	}
 	return tkn.call()
 }
+
+// TODO: support anonymous functions
 func (tkn Tokens) call() (Exp, error) {
 	callee, err := tkn.primary()
 	opsToMatch := scanner.LEFT_PAREN
@@ -1480,6 +1477,8 @@ Matching_Loop:
 				continue
 			}
 			//non-empty parameters
+			// TODO:parse args as statements and expect funcDef,expression statements
+			// if funcDef, add just add the name else add the expression
 			exp, err := tkn.list()
 			if err != nil {
 				return nil, err
