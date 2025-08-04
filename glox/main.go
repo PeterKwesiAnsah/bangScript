@@ -31,13 +31,27 @@ func main() {
 		globalEnv := parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
 		stmts, err := parser.Parser(tokens, &globalEnv)
 		if err != nil {
-			fmt.Printf("%s\n", err.Error())
+			fmt.Printf("ParseError: %s\n", err.Error())
 			os.Exit(1)
 		}
 		for _, stmt := range stmts {
-			err := stmt.Execute(&globalEnv)
-			if err != nil {
-				fmt.Printf("%s\n", err.Error())
+			if stmt == nil {
+				continue
+			}
+			var executionError error
+			switch stmt.(type) {
+			case parser.WhileStmt:
+				executionError = stmt.Execute(nil)
+			case parser.BlockStmt:
+				executionError = stmt.Execute(nil)
+				//case.parse.funcDef:
+			//executionError = stmt.Execute(nil)
+			default:
+				//for statements that have their own env,statement.Env you will be executed with nil
+				executionError = stmt.Execute(&globalEnv)
+			}
+			if executionError != nil {
+				fmt.Printf("ExecutionError: %s\n", executionError.Error())
 				os.Exit(1)
 			}
 		}
