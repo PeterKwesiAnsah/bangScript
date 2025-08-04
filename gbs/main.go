@@ -4,9 +4,9 @@ TODO: run interpretor through interactive prompt (REPL)
 package main
 
 import (
+	"bangScript/gbs/parser"
+	"bangScript/gbs/scanner"
 	"fmt"
-	"lox/glox/parser"
-	"lox/glox/scanner"
 	"os"
 )
 
@@ -14,7 +14,7 @@ func main() {
 	args := os.Args
 
 	if len(args) > 2 {
-		fmt.Printf("Usage: glox [path_to_script]\n")
+		fmt.Printf("Usage: bs [path_to_script] or bs (to launch REPL)\n")
 		os.Exit(1)
 	} else if len(args) == 2 {
 		path := args[1]

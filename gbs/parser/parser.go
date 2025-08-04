@@ -1,12 +1,12 @@
 package parser
 
 import (
+	"bangScript/gbs/scanner"
 	"fmt"
-	"lox/glox/scanner"
 	"strconv"
 )
 
-type loxReturn struct {
+type bsReturn struct {
 	value Obj
 }
 
@@ -236,7 +236,7 @@ func (t returnStmt) Execute(env *Stmtsenv) error {
 	if err != nil {
 		return err
 	}
-	panic(loxReturn{
+	panic(bsReturn{
 		value: value,
 	})
 }
@@ -336,7 +336,7 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	defer func() {
 		if r := recover(); r != nil {
 			switch s := r.(type) {
-			case loxReturn:
+			case bsReturn:
 				value = s.value
 			default:
 				panic(r)
