@@ -4,9 +4,9 @@ TODO: run interpretor through interactive prompt (REPL)
 package main
 
 import (
-	"bs/gbs/parser"
-	"bs/gbs/scanner"
 	"fmt"
+	"lox/glox/parser"
+	"lox/glox/scanner"
 	"os"
 )
 
@@ -14,7 +14,7 @@ func main() {
 	args := os.Args
 
 	if len(args) > 2 {
-		fmt.Printf("Usage: gbs [path_to_script]\n")
+		fmt.Printf("Usage: glox [path_to_script]\n")
 		os.Exit(1)
 	} else if len(args) == 2 {
 		path := args[1]

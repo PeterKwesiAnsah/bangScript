@@ -465,8 +465,8 @@ func TestIdentifiers(t *testing.T) {
 	}
 }
 
-// TestBsProgramWithComments tests a bangScript program with various types of comments
-func TestBsProgramWithComments(t *testing.T) {
+// TestLoxProgramWithComments tests a Lox program with various types of comments
+func TestLoxProgramWithComments(t *testing.T) {
 	source := `
 // This is a line comment
 class Test {
@@ -517,8 +517,8 @@ print test.getValue(); /* Should print 42 */
 	}
 }
 
-// TestComplexBangScriptProgram tests scanning a more complex BangScript program with multiple features
-func TestComplexBangScriptProgram(t *testing.T) {
+// TestComplexLoxProgram tests scanning a more complex Lox program with multiple features
+func TestComplexLoxProgram(t *testing.T) {
 	source := `
 /*
  * Fibonacci function implementation

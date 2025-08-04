@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"bs/gbs/scanner"
+	"lox/glox/scanner"
 	"reflect"
 	"testing"
 )
