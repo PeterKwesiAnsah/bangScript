@@ -6,56 +6,90 @@ package main
 import (
 	"bangScript/gbs/parser"
 	"bangScript/gbs/scanner"
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
+
+const (
+	REPL uint8 = iota
+	SCRIPT
+)
+
+type source []byte
+
+func (t source) RunCode(mode uint8) error {
+	tokens, err := scanner.ScanTokens(t)
+	if err != nil {
+		return err
+	}
+	globalEnv := parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
+	stmts, err := parser.Parser(tokens, &globalEnv, mode)
+	if err != nil {
+		return err
+	}
+	for _, stmt := range stmts {
+		if stmt == nil {
+			continue
+		}
+		var executionError error
+		//TODO: complete Stmts with Env
+		switch stmt.(type) {
+		case parser.WhileStmt:
+			executionError = stmt.Execute(nil)
+		case parser.BlockStmt:
+			executionError = stmt.Execute(nil)
+		default:
+			executionError = stmt.Execute(&globalEnv)
+		}
+		if executionError != nil {
+			return executionError
+		}
+	}
+	return nil
+}
 
 func main() {
 	args := os.Args
-
 	if len(args) > 2 {
 		fmt.Printf("Usage: bs [path_to_script] or bs (to launch REPL)\n")
 		os.Exit(1)
 	} else if len(args) == 2 {
 		path := args[1]
-		source, err := os.ReadFile(path)
+		contents, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Printf("Failed to open file :%s\n", err.Error())
 			os.Exit(1)
 		}
-		tokens, err := scanner.ScanTokens(source)
+		var src source = contents
+		err = src.RunCode(SCRIPT)
 		if err != nil {
-			fmt.Printf("%s\n", err.Error())
+			fmt.Printf(err.Error())
 			os.Exit(1)
-		}
-		globalEnv := parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
-		stmts, err := parser.Parser(tokens, &globalEnv)
-		if err != nil {
-			fmt.Printf("ParseError: %s\n", err.Error())
-			os.Exit(1)
-		}
-		for _, stmt := range stmts {
-			if stmt == nil {
-				continue
-			}
-			var executionError error
-			switch stmt.(type) {
-			case parser.WhileStmt:
-				executionError = stmt.Execute(nil)
-			case parser.BlockStmt:
-				executionError = stmt.Execute(nil)
-				//case.parse.funcDef:
-			//executionError = stmt.Execute(nil)
-			default:
-				//for statements that have their own env,statement.Env you will be executed with nil
-				executionError = stmt.Execute(&globalEnv)
-			}
-			if executionError != nil {
-				fmt.Printf("ExecutionError: %s\n", executionError.Error())
-				os.Exit(1)
-			}
 		}
 	} else {
-		fmt.Print("Run: REPL\n")
+		scannerIO := bufio.NewScanner(os.Stdin)
+		fmt.Println("Welcome to bangScript interactive REPL")
+		fmt.Println("Press 'exit' or 'quit' to leave the REPL")
+		for {
+			fmt.Print("> ")
+			if !scannerIO.Scan() {
+				break
+			}
+			input := strings.TrimSpace(scannerIO.Text())
+			if input == "exit" || input == "quit" {
+				break
+			}
+			var src source = []byte(input)
+			err := src.RunCode(REPL)
+			if err != nil {
+				fmt.Printf(err.Error())
+				os.Exit(1)
+			}
+			if err := scannerIO.Err(); err != nil {
+				fmt.Printf("Error reading input: %v\n", err)
+			}
+		}
 	}
 }

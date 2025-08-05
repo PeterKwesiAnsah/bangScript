@@ -11,6 +11,11 @@ type bsReturn struct {
 }
 
 const (
+	REPL uint8 = iota
+	SCRIPT
+)
+
+const (
 	STATIC uint8 = iota
 	DYNAMIC
 )
@@ -159,7 +164,9 @@ type expStmt struct {
 
 var current int = 0
 var cs CallStack = CallStack{}
+var mode uint8 = REPL
 
+// TODO: expressions executed in global in REPL, will be printed automatically
 func (t *forStmt) StaticToDynamic(parent *Stmtsenv) error {
 	//t.stmt.env is environment for condition,initializer and single body statement
 	if t.stmt.env == parent {
@@ -773,7 +780,14 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 }
 
 func (t expStmt) Execute(env *Stmtsenv) error {
-	_, err := t.exp.Evaluate(env)
+	obj, err := t.exp.Evaluate(env)
+	if err != nil {
+		return err
+	}
+	if mode == REPL && env.Encloser == nil {
+		fmt.Printf("%v\n", obj)
+		return nil
+	}
 	return err
 }
 func (tkn Tokens) expStmt() (Stmt, error) {
@@ -783,11 +797,18 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 		return nil, err
 	}
 	stmt.exp = exp
-	//expect a ";" terminator
-	if tkn[current].Ttype != scanner.SEMICOLON {
-		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+	//expect a ";" terminator only for script mode
+	if mode == REPL {
+		if tkn[current].Ttype == scanner.SEMICOLON {
+			current++
+		}
+	} else {
+		if tkn[current].Ttype != scanner.SEMICOLON {
+			return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+		}
+		current++
 	}
-	current++
+
 	return stmt, nil
 }
 
@@ -832,8 +853,9 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	//expression statement
 	return tkn.expStmt()
 }
-func Parser(tkn Tokens, globalEnv *Stmtsenv) ([]Stmt, error) {
+func Parser(tkn Tokens, globalEnv *Stmtsenv, m uint8) ([]Stmt, error) {
 	stmts := []Stmt{}
+	mode = m
 	for tkn[current].Ttype != scanner.EOF {
 		stmt, err := tkn.declarations(globalEnv)
 		if err != nil {
