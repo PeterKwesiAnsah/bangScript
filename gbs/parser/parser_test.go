@@ -20,44 +20,44 @@ func TestPrimaryExpression(t *testing.T) {
 	tests := []struct {
 		name     string
 		tokens   Tokens
-		expected primary
+		expected Primary
 	}{
 		{
 			name:     "Number literal",
 			tokens:   Tokens{makeToken(scanner.NUMBER, "42", 1), makeToken(scanner.EOF, "", 1)},
-			expected: primary{node: makeToken(scanner.NUMBER, "42", 1)},
+			expected: Primary{Node: makeToken(scanner.NUMBER, "42", 1)},
 		},
 		{
 			name:     "String literal",
 			tokens:   Tokens{makeToken(scanner.STRING, "hello", 1), makeToken(scanner.EOF, "", 1)},
-			expected: primary{node: makeToken(scanner.STRING, "hello", 1)},
+			expected: Primary{Node: makeToken(scanner.STRING, "hello", 1)},
 		},
 		{
 			name:     "Boolean true",
 			tokens:   Tokens{makeToken(scanner.TRUE, "true", 1), makeToken(scanner.EOF, "", 1)},
-			expected: primary{node: makeToken(scanner.TRUE, "true", 1)},
+			expected: Primary{Node: makeToken(scanner.TRUE, "true", 1)},
 		},
 		{
 			name:     "Boolean false",
 			tokens:   Tokens{makeToken(scanner.FALSE, "false", 1), makeToken(scanner.EOF, "", 1)},
-			expected: primary{node: makeToken(scanner.FALSE, "false", 1)},
+			expected: Primary{Node: makeToken(scanner.FALSE, "false", 1)},
 		},
 		{
 			name:     "Nil literal",
 			tokens:   Tokens{makeToken(scanner.NIL, "nil", 1), makeToken(scanner.EOF, "", 1)},
-			expected: primary{node: makeToken(scanner.NIL, "nil", 1)},
+			expected: Primary{Node: makeToken(scanner.NIL, "nil", 1)},
 		},
 		{
 			name:     "Identifier",
 			tokens:   Tokens{makeToken(scanner.IDENTIFIER, "variable", 1), makeToken(scanner.EOF, "", 1)},
-			expected: primary{node: makeToken(scanner.IDENTIFIER, "variable", 1)},
+			expected: Primary{Node: makeToken(scanner.IDENTIFIER, "variable", 1)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			primResult, err := tt.tokens.expression()
 			if err != nil {
-				t.Fatalf("Expected primary expression, got %s", err.Error())
+				t.Fatalf("Expected Primary expression, got %s", err.Error())
 			}
 			if !reflect.DeepEqual(primResult, tt.expected) {
 				t.Errorf("Expected %+v, got %+v", tt.expected, primResult)
@@ -75,7 +75,7 @@ func TestUnaryExpression(t *testing.T) {
 	tests := []struct {
 		name     string
 		tokens   Tokens
-		expected unary
+		expected Unary
 	}{
 		{
 			name: "Negation",
@@ -84,9 +84,9 @@ func TestUnaryExpression(t *testing.T) {
 				numberT,
 				EOFT,
 			},
-			expected: unary{
+			expected: Unary{
 				operator: minusT,
-				right:    primary{node: numberT},
+				right:    Primary{Node: numberT},
 			},
 		},
 		{
@@ -96,9 +96,9 @@ func TestUnaryExpression(t *testing.T) {
 				idT,
 				EOFT,
 			},
-			expected: unary{
+			expected: Unary{
 				operator: bangT,
-				right:    primary{node: idT},
+				right:    Primary{Node: idT},
 			},
 		},
 		{
@@ -109,23 +109,23 @@ func TestUnaryExpression(t *testing.T) {
 				idT,
 				EOFT,
 			},
-			expected: unary{
+			expected: Unary{
 				operator: bangT,
-				right: unary{
+				right: Unary{
 					operator: bangT,
-					right:    primary{node: idT},
+					right:    Primary{Node: idT},
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			unaryResult, err := tt.tokens.expression()
+			UnaryResult, err := tt.tokens.expression()
 			if err != nil {
-				t.Fatalf("Expected unary expression, got %T", err)
+				t.Fatalf("Expected Unary expression, got %T", err)
 			}
-			if !reflect.DeepEqual(unaryResult, tt.expected) {
-				t.Errorf("Expected %+v, got %+v", tt.expected, unaryResult)
+			if !reflect.DeepEqual(UnaryResult, tt.expected) {
+				t.Errorf("Expected %+v, got %+v", tt.expected, UnaryResult)
 			}
 		})
 	}
@@ -165,43 +165,43 @@ func TestBinaryExpression(t *testing.T) {
 	tests := []struct {
 		name     string
 		tokens   Tokens
-		expected binary
+		expected Binary
 	}{
 		// Arithmetic operators
 		{
 			name:   "Addition",
 			tokens: Tokens{numberA, plus, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: plus,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Subtraction",
 			tokens: Tokens{numberA, minus, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: minus,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Multiplication",
 			tokens: Tokens{numberA, star, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: star,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Division",
 			tokens: Tokens{numberA, slash, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: slash,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 
@@ -209,10 +209,10 @@ func TestBinaryExpression(t *testing.T) {
 		{
 			name:   "String concatenation",
 			tokens: Tokens{stringA, plus, stringB, EOFT},
-			expected: binary{
-				left:     primary{node: stringA},
+			expected: Binary{
+				left:     Primary{Node: stringA},
 				operator: plus,
-				right:    primary{node: stringB},
+				right:    Primary{Node: stringB},
 			},
 		},
 
@@ -220,55 +220,55 @@ func TestBinaryExpression(t *testing.T) {
 		{
 			name:   "Greater than",
 			tokens: Tokens{numberA, greater, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: greater,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Greater than or equal",
 			tokens: Tokens{numberA, greaterEqual, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: greaterEqual,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Less than",
 			tokens: Tokens{numberA, less, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: less,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Less than or equal",
 			tokens: Tokens{numberA, lessEqual, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: lessEqual,
-				right:    primary{node: numberB},
+				right:    Primary{Node: numberB},
 			},
 		},
 		{
 			name:   "Equal",
 			tokens: Tokens{idA, equalEqual, idB, EOFT},
-			expected: binary{
-				left:     primary{node: idA},
+			expected: Binary{
+				left:     Primary{Node: idA},
 				operator: equalEqual,
-				right:    primary{node: idB},
+				right:    Primary{Node: idB},
 			},
 		},
 		{
 			name:   "Not equal",
 			tokens: Tokens{idA, bangEqual, idB, EOFT},
-			expected: binary{
-				left:     primary{node: idA},
+			expected: Binary{
+				left:     Primary{Node: idA},
 				operator: bangEqual,
-				right:    primary{node: idB},
+				right:    Primary{Node: idB},
 			},
 		},
 		// Logical operators
@@ -276,34 +276,34 @@ func TestBinaryExpression(t *testing.T) {
 			{
 				name:   "Logical AND",
 				tokens: Tokens{trueT, and, falseT, EOFT},
-				expected: binary{
-					left:     primary{node: trueT},
+				expected: Binary{
+					left:     Primary{Node: trueT},
 					operator: and,
-					right:    primary{node: falseT},
+					right:    Primary{Node: falseT},
 				},
 			},
 			{
 				name:   "Logical OR",
 				tokens: Tokens{trueT, or, falseT, EOFT},
-				expected: binary{
-					left:     primary{node: trueT},
+				expected: Binary{
+					left:     Primary{Node: trueT},
 					operator: or,
-					right:    primary{node: falseT},
+					right:    Primary{Node: falseT},
 				},
 			},
 		*/
 
 		// Complex expressions
 		{
-			name:   "Chained binary expressions (1 + 2 * 3)",
+			name:   "Chained Binary expressions (1 + 2 * 3)",
 			tokens: Tokens{numberA, plus, numberB, star, makeToken(scanner.NUMBER, "3", 1), EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: plus,
-				right: binary{
-					left:     primary{node: numberB},
+				right: Binary{
+					left:     Primary{Node: numberB},
 					operator: star,
-					right:    primary{node: makeToken(scanner.NUMBER, "3", 1)},
+					right:    Primary{Node: makeToken(scanner.NUMBER, "3", 1)},
 				},
 			},
 		},
@@ -311,12 +311,12 @@ func TestBinaryExpression(t *testing.T) {
 		{
 			name:   "Binary with Unary right operand",
 			tokens: Tokens{numberA, plus, minus, numberB, EOFT},
-			expected: binary{
-				left:     primary{node: numberA},
+			expected: Binary{
+				left:     Primary{Node: numberA},
 				operator: plus,
-				right: unary{
+				right: Unary{
 					operator: minus,
-					right:    primary{node: numberB},
+					right:    Primary{Node: numberB},
 				},
 			},
 		},
@@ -326,13 +326,13 @@ func TestBinaryExpression(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := tt.tokens.expression()
 			if err != nil {
-				t.Fatalf("Expected binary expression, got error: %s", err.Error())
+				t.Fatalf("Expected Binary expression, got error: %s", err.Error())
 			}
 
 			// Type check
-			binResult, ok := result.(binary)
+			binResult, ok := result.(Binary)
 			if !ok {
-				t.Fatalf("Expected binary expression, got %T", result)
+				t.Fatalf("Expected Binary expression, got %T", result)
 			}
 
 			if !reflect.DeepEqual(binResult, tt.expected) {
@@ -359,21 +359,21 @@ func TestParenthesizeExpression(t *testing.T) {
 		{
 			name:     "Simple grouping",
 			tokens:   Tokens{leftParen, numberT, rightParen, EOFT},
-			expected: primary{node: numberT},
+			expected: Primary{Node: numberT},
 		},
 		{
-			name:   "Grouped binary expression",
+			name:   "Grouped Binary expression",
 			tokens: Tokens{leftParen, numberT, plus, number2T, rightParen, EOFT},
-			expected: binary{
-				left:     primary{node: numberT},
+			expected: Binary{
+				left:     Primary{Node: numberT},
 				operator: plus,
-				right:    primary{node: number2T},
+				right:    Primary{Node: number2T},
 			},
 		},
 		{
 			name:     "Nested grouping",
 			tokens:   Tokens{leftParen, leftParen, numberT, rightParen, rightParen, EOFT},
-			expected: primary{node: numberT},
+			expected: Primary{Node: numberT},
 		},
 	}
 
@@ -416,13 +416,13 @@ func TestOperatorPrecedence(t *testing.T) {
 		{
 			name:   "Multiplication before addition",
 			tokens: Tokens{num1, plus, num2, star, num3, EOFT},
-			expected: binary{
-				left:     primary{node: num1},
+			expected: Binary{
+				left:     Primary{Node: num1},
 				operator: plus,
-				right: binary{
-					left:     primary{node: num2},
+				right: Binary{
+					left:     Primary{Node: num2},
 					operator: star,
-					right:    primary{node: num3},
+					right:    Primary{Node: num3},
 				},
 			},
 			description: "1 + 2 * 3 should evaluate as 1 + (2 * 3)",
@@ -430,13 +430,13 @@ func TestOperatorPrecedence(t *testing.T) {
 		{
 			name:   "Division before subtraction",
 			tokens: Tokens{num1, minus, num2, slash, num3, EOFT},
-			expected: binary{
-				left:     primary{node: num1},
+			expected: Binary{
+				left:     Primary{Node: num1},
 				operator: minus,
-				right: binary{
-					left:     primary{node: num2},
+				right: Binary{
+					left:     Primary{Node: num2},
 					operator: slash,
-					right:    primary{node: num3},
+					right:    Primary{Node: num3},
 				},
 			},
 			description: "1 - 2 / 3 should evaluate as 1 - (2 / 3)",
@@ -445,17 +445,17 @@ func TestOperatorPrecedence(t *testing.T) {
 			 * 	{
 					name:   "Comparison before logical AND",
 					tokens: Tokens{num1, greater, num2, and, num3, less, num4, EOFT},
-					expected: binary{
-						left: binary{
-							left:     primary{node: num1},
+					expected: Binary{
+						left: Binary{
+							left:     Primary{Node: num1},
 							operator: greater,
-							right:    primary{node: num2},
+							right:    Primary{Node: num2},
 						},
 						operator: and,
-						right: binary{
-							left:     primary{node: num3},
+						right: Binary{
+							left:     Primary{Node: num3},
 							operator: less,
-							right:    primary{node: num4},
+							right:    Primary{Node: num4},
 						},
 					},
 					description: "1 > 2 and 3 < 4 should evaluate as (1 > 2) and (3 < 4)",
@@ -464,14 +464,14 @@ func TestOperatorPrecedence(t *testing.T) {
 		{
 			name:   "Parentheses override precedence",
 			tokens: Tokens{leftParen, num1, plus, num2, rightParen, star, num3, EOFT},
-			expected: binary{
-				left: binary{
-					left:     primary{node: num1},
+			expected: Binary{
+				left: Binary{
+					left:     Primary{Node: num1},
 					operator: plus,
-					right:    primary{node: num2},
+					right:    Primary{Node: num2},
 				},
 				operator: star,
-				right:    primary{node: num3},
+				right:    Primary{Node: num3},
 			},
 			description: "(1 + 2) * 3 should evaluate as (1 + 2) * 3",
 		},
@@ -479,14 +479,14 @@ func TestOperatorPrecedence(t *testing.T) {
 		{
 			name:   "Nested Parentheses override precedence",
 			tokens: Tokens{leftParen, leftParen, num1, plus, num2, rightParen, rightParen, star, num3, EOFT},
-			expected: binary{
-				left: binary{
-					left:     primary{node: num1},
+			expected: Binary{
+				left: Binary{
+					left:     Primary{Node: num1},
 					operator: plus,
-					right:    primary{node: num2},
+					right:    Primary{Node: num2},
 				},
 				operator: star,
-				right:    primary{node: num3},
+				right:    Primary{Node: num3},
 			},
 			description: "(((1 + 2)) * 3 should evaluate as (1 + 2) * 3",
 		},
