@@ -24,12 +24,10 @@ type StmtWithEnv interface {
 	StaticToDynamic(*Stmtsenv) error
 }
 
-// statements that carry their own env, whileStmt,blockStmt,funDef (but through their body),forStmt
 type Tokens []*scanner.Token
 type Obj interface{}
 
 type Exp interface {
-	//should take in an environment or context
 	Evaluate(env *Stmtsenv) (Obj, error)
 	//print() string
 }
@@ -45,29 +43,8 @@ type CallDetails struct {
 type CallStack []*CallDetails
 
 // TODO: have a map of scanner token type to string (12 becomes colon)
-// callStack grows , so do env
 type Callable interface {
-	//we create new copies of ...env.Local=map[string]Obj{}
-	// reference of body.env still stays the same and has access to it's parent environment
-	// we are keeping body.env as reference but cleaning the slate anytime we have a function call
-	// x86-64 abi, the same set of cpu registers are used to hold function arguments but are saved first before a function so the caller's state or arguments does not lost and returned back
-	// when the callee returns so perhaps we replicate this behavior
-	//
-	call(*CallStack, *call) (Obj, error)
-}
-
-type returnStmt struct {
-	//currently we allow returns to exps for now. In the future we change to statment because of closures
-	exp Exp
-}
-
-// implements Callable interface and statement
-// before we call .call() caller must set up the arguments in it's environment
-type funcDef struct {
-	name   *scanner.Token
-	params []*scanner.Token
-	body   BlockStmt
-	arrity int
+	call(*CallStack, *Call) (Obj, error)
 }
 
 type Stmtsenv struct {
@@ -76,98 +53,11 @@ type Stmtsenv struct {
 	Policy   uint8
 }
 
-type call struct {
-	callee   Exp
-	operator *scanner.Token
-	arrity   int
-	args     Exp
-}
-
-type list struct {
-	expressions []Exp
-}
-
-type assigment struct {
-	//l-value
-	storeTarget Exp
-	operator    *scanner.Token
-	//r-value
-	right Exp
-}
-
-type logicalOr struct {
-	left     Exp
-	operator *scanner.Token
-	right    Exp
-}
-type logicalAnd struct {
-	left     Exp
-	operator *scanner.Token
-	right    Exp
-}
-
-type binary struct {
-	left     Exp
-	operator *scanner.Token
-	right    Exp
-}
-
-// TODO: for handling conditional operations
-type tenary struct {
-	condition Exp
-	operator  *scanner.Token
-	then      Exp
-	elsef     Exp
-}
-
-type unary struct {
-	operator *scanner.Token
-	right    Exp
-}
-
-type primary struct {
-	node *scanner.Token
-}
-
-type ifStmt struct {
-	condition Exp
-	thenbody  Stmt
-	elsebody  Stmt
-}
-type forStmt struct {
-	stmt WhileStmt
-}
-type WhileStmt struct {
-	condition Exp
-	body      BlockStmt
-	init      Stmt
-	env       *Stmtsenv
-}
-
-type BlockStmt struct {
-	stmts []Stmt
-	env   *Stmtsenv
-}
-
-type varStmt struct {
-	//we expect scanner.Token to be an identifier
-	name *scanner.Token
-	exp  Exp
-}
-type printStmt struct {
-	exp Exp
-}
-
-type expStmt struct {
-	exp Exp
-}
-
 var current int = 0
 var cs CallStack = CallStack{}
 var mode uint8 = REPL
 
-// TODO: expressions executed in global in REPL, will be printed automatically
-func (t *forStmt) StaticToDynamic(parent *Stmtsenv) error {
+func (t *ForStmt) StaticToDynamic(parent *Stmtsenv) error {
 	//t.stmt.env is environment for condition,initializer and single body statement
 	if t.stmt.env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
@@ -187,10 +77,9 @@ func (t *forStmt) StaticToDynamic(parent *Stmtsenv) error {
 			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
 		}
 	}
-
 	return nil
 }
-func (t *funcDef) StaticToDynamic(parent *Stmtsenv) error {
+func (t *FuncDef) StaticToDynamic(parent *Stmtsenv) error {
 	if t.body.env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
@@ -238,7 +127,7 @@ func (t *WhileStmt) StaticToDynamic(parent *Stmtsenv) error {
 	return nil
 }
 
-func (t returnStmt) Execute(env *Stmtsenv) error {
+func (t ReturnStmt) Execute(env *Stmtsenv) error {
 	value, err := t.exp.Evaluate(env)
 	if err != nil {
 		return err
@@ -257,7 +146,7 @@ func (tkn Tokens) returnStmt() (Stmt, error) {
 		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
 	current++
-	return returnStmt{
+	return ReturnStmt{
 		exp: exp,
 	}, nil
 }
@@ -304,6 +193,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
 		stmt, err := tkn.declarations(&inner)
 		//TODO:if stmt is continue/break or any other loop related statement we throw error because loops will now handle parsing it's body
+		//TODO: handle the above with the resolver
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +206,7 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	stmt.stmts = stmts
 	stmt.env = &inner
 
-	return funcDef{
+	return FuncDef{
 		arrity: len(params),
 		name:   name,
 		body:   stmt,
@@ -325,19 +215,15 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 }
 
 // evaluate to "<fn funcname >"
-// func (t funcDef) Evaluate(env *Stmtsenv) (Obj, error)
+// func (t FuncDef) Evaluate(env *Stmtsenv) (Obj, error)
 // bind function name to it's value in env.
-func (t funcDef) Execute(env *Stmtsenv) error {
+func (t FuncDef) Execute(env *Stmtsenv) error {
 	bs := t.body
-	//if bs.env.Encloser != env {
-	//return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
-	//}
 	bs.env.Encloser.Local[t.name.Lexem] = t
-	// snapshot bs.env.Encloser
 	return nil
 }
 
-func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (value Obj, err error) {
+func (t FuncDef) call(env *Stmtsenv, callStack *CallStack, callInfo *Call) (value Obj, err error) {
 	bs := t.body
 
 	defer func() {
@@ -357,7 +243,7 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 
 	envWithFunctionArgsOnly := newEnv.Local
 	if callInfo.args != nil {
-		listArgs, isArgs := callInfo.args.(list)
+		listArgs, isArgs := callInfo.args.(List)
 		if isArgs {
 			for argI, exp := range listArgs.expressions {
 				value, err := exp.Evaluate(env)
@@ -389,11 +275,10 @@ func (t funcDef) call(env *Stmtsenv, callStack *CallStack, callInfo *call) (valu
 	return value, nil
 }
 
-func (t forStmt) Execute(parent *Stmtsenv) error {
+func (t ForStmt) Execute(parent *Stmtsenv) error {
 	return t.stmt.Execute(nil)
 }
 
-// Implementing a for loop using a while loop automatically , creates a block scope where the initializer sits
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	var initializer Stmt = nil
 	var condition Exp = nil
@@ -413,7 +298,7 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 		}
 		//automatically consumes the semi-colon token because we are parsing the initializer as a statement (expression statement for assignment/variable decl)
 	} else {
-		//empty initializer (variable declaration/assigment)
+		//empty initializer (variable declaration/Assigment)
 		current++
 	}
 	if tkn[current].Ttype != scanner.SEMICOLON {
@@ -445,8 +330,8 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	}
 	// empty body statement
 	if tkn[current].Ttype == scanner.SEMICOLON {
-		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
-			body: BlockStmt{stmts: []Stmt{expStmt{exp: sideEffect}}, env: &whileScope}}}, nil
+		return ForStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
+			body: BlockStmt{stmts: []Stmt{ExpStmt{exp: sideEffect}}, env: &whileScope}}}, nil
 	}
 	body, err = tkn.declarations(&whileScope)
 	if err != nil {
@@ -456,12 +341,12 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	bs, isBS := body.(BlockStmt)
 	if isBS {
 		stmts := bs.stmts
-		stmts = append(stmts, expStmt{exp: sideEffect})
-		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope, body: BlockStmt{stmts: stmts, env: bs.env}}}, nil
+		stmts = append(stmts, ExpStmt{exp: sideEffect})
+		return ForStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope, body: BlockStmt{stmts: stmts, env: bs.env}}}, nil
 	} else {
 		//single statement body
-		return forStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
-			body: BlockStmt{stmts: []Stmt{body, expStmt{exp: sideEffect}},
+		return ForStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
+			body: BlockStmt{stmts: []Stmt{body, ExpStmt{exp: sideEffect}},
 				env: &whileScope}}}, nil
 	}
 }
@@ -532,7 +417,7 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	return WhileStmt{condition: cond, body: bs, env: Encloser}, nil
 }
 
-func (t ifStmt) Execute(env *Stmtsenv) error {
+func (t IfStmt) Execute(env *Stmtsenv) error {
 
 	obj, err := t.condition.Evaluate(env)
 	if err != nil {
@@ -541,7 +426,6 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 	isTruth := isTruthy(obj)
 
 	if isTruth {
-		//these are statements that need their environment updated becuase they either carry own env or have nodes that carry their own env
 		switch s := t.thenbody.(type) {
 		case WhileStmt:
 			err = s.StaticToDynamic(env)
@@ -555,13 +439,13 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 				return err
 			}
 			err = s.Execute(nil)
-		case funcDef:
+		case FuncDef:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
-		case forStmt:
+		case ForStmt:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
@@ -577,7 +461,6 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 		if t.elsebody == nil {
 			return nil
 		}
-		//these are statements that need their environment updated
 		switch s := t.elsebody.(type) {
 		case WhileStmt:
 			err = s.StaticToDynamic(env)
@@ -591,13 +474,13 @@ func (t ifStmt) Execute(env *Stmtsenv) error {
 				return err
 			}
 			err = s.Execute(nil)
-		case funcDef:
+		case FuncDef:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(env)
-		case forStmt:
+		case ForStmt:
 			err = s.StaticToDynamic(env)
 			if err != nil {
 				return err
@@ -639,7 +522,7 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 			return nil, err
 		}
 	}
-	return ifStmt{condition: condexp, thenbody: stmtBody, elsebody: elseStmt}, nil
+	return IfStmt{condition: condexp, thenbody: stmtBody, elsebody: elseStmt}, nil
 }
 
 func (t BlockStmt) Execute(env *Stmtsenv) error {
@@ -664,20 +547,19 @@ func (t BlockStmt) Execute(env *Stmtsenv) error {
 				return err
 			}
 			err = s.Execute(nil)
-		case funcDef:
+		case FuncDef:
 			err = s.StaticToDynamic(t.env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
-		case forStmt:
+		case ForStmt:
 			err = s.StaticToDynamic(t.env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
 		default:
-			//for statements that have their own env,statement.Env you will be executed with nil
 			err = s.Execute(t.env)
 		}
 		if err != nil {
@@ -693,7 +575,8 @@ func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 	stmt := BlockStmt{}
 	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
 		stmt, err := tkn.declarations(&inner)
-		// if stmt is continue/break/return or any other loop related statement we throw error because loops will now handle parsing it's body
+		// TODO:if stmt is continue/break/return or any other loop related statement we throw error because loops will now handle parsing it's body
+		// TODO: handle the above in the resolver
 		if err != nil {
 			return nil, err
 		}
@@ -708,18 +591,17 @@ func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 	return stmt, nil
 }
 
-func (t printStmt) Execute(env *Stmtsenv) error {
+func (t PrintStmt) Execute(env *Stmtsenv) error {
 	Obj, err := t.exp.Evaluate(env)
 	if err != nil {
 		return err
 	}
-	//check if Obj is a funcDef, if true we call .Evaluate on it again
 	//TODO:function def don't evaluate to simple scalar values like integer,bool etc it evaluates to a struct which won't print nicely
 	fmt.Printf("%v\n", Obj)
 	return nil
 }
 func (tkn Tokens) printStmt() (Stmt, error) {
-	stmt := printStmt{}
+	stmt := PrintStmt{}
 	exp, err := tkn.expression()
 	if err != nil {
 		return nil, err
@@ -733,27 +615,26 @@ func (tkn Tokens) printStmt() (Stmt, error) {
 	return stmt, nil
 }
 
-func (t varStmt) Execute(env *Stmtsenv) error {
-	//var obj Obj = nil
+func (t VarStmt) Execute(env *Stmtsenv) error {
 	//check if variable declaration have a definition
-	if t.exp != nil {
-		switch s := t.exp.(type) {
-		case primary:
-			env.Local[s.node.Lexem] = nil
-		case assigment:
+	if t.Exp != nil {
+		switch s := t.Exp.(type) {
+		case Primary:
+			env.Local[s.Node.Lexem] = nil
+		case Assigment:
 			//for now only primary identifier expressions map to a storage location
-			lv, isStorageTarget := s.storeTarget.(primary)
-			if !(isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER) {
+			lv, isStorageTarget := s.StoreTarget.(Primary)
+			if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
 				return fmt.Errorf("Cannot use the l-value as storage target")
 			}
-			obj, err := s.right.Evaluate(env)
+			obj, err := s.Right.Evaluate(env)
 			if err != nil {
 				return err
 			}
-			env.Local[lv.node.Lexem] = obj
-		case list:
+			env.Local[lv.Node.Lexem] = obj
+		case List:
 			for _, exp := range s.expressions {
-				err := varStmt{nil, exp}.Execute(env)
+				err := VarStmt{nil, exp}.Execute(env)
 				if err != nil {
 					return err
 				}
@@ -766,12 +647,12 @@ func (t varStmt) Execute(env *Stmtsenv) error {
 }
 
 func (tkn Tokens) varStmt() (Stmt, error) {
-	stmt := varStmt{}
+	stmt := VarStmt{}
 	exp, err := tkn.expression()
 	if err != nil {
 		return nil, err
 	}
-	stmt.exp = exp
+	stmt.Exp = exp
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
@@ -779,7 +660,7 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 	return stmt, nil
 }
 
-func (t expStmt) Execute(env *Stmtsenv) error {
+func (t ExpStmt) Execute(env *Stmtsenv) error {
 	obj, err := t.exp.Evaluate(env)
 	if err != nil {
 		return err
@@ -791,7 +672,7 @@ func (t expStmt) Execute(env *Stmtsenv) error {
 	return err
 }
 func (tkn Tokens) expStmt() (Stmt, error) {
-	stmt := expStmt{}
+	stmt := ExpStmt{}
 	exp, err := tkn.expression()
 	if err != nil {
 		return nil, err
@@ -866,47 +747,13 @@ func Parser(tkn Tokens, globalEnv *Stmtsenv, m uint8) ([]Stmt, error) {
 	return stmts, nil
 }
 
-// statements are now into two Declaration Statements (are statements like varDeclartion,function,classes. These statements usually cant be used directly after constructs like if and while) and Regular Statements
-// program->declarations*EOF
-// declarations->varDeclar | statements
-// varDeclar->"var" IDENTIFIER (=expression)?";"
-// statements->printStmt | blockStmt | expressionStmt | ifStmt
-// "if(exp)
-// block->"{" declarations* "}"
-// printStmt->"print" expression ";"
-// expressionStmt->expression;
-// expression->assignment
-// assigment->equality ("=" assignment)*
-
-////statement rules and their interface implementaion
-
-// end
-
-///////////////////////expression rules and their interface implementation
-/**
- * evaluating expressions also defines what the user can do and what types or operands can perform this operations
- * binary arithemetic operations (+)(/)(*)(-)
- * (+) has operator overloading
- * (+) (string + string) string, (double + double) double (only)
- * (/) (double / double) double (only)
- * (-) (double - double) double (only)
- * unary operations (!)(-)
- * (!) (boolean) bool
- * (-) (double) double
- * binary logical operations (==)(!=)(>)(>=)(<)(<=)
- * (==)(string | double | boolean) bool
- * (!=)(string | double | boolean) bool
- * (>)(>=)(<)(<=) (double  (>)(>=)(<)(<=) double ) bool
- * TODO: add support for logical (&&) (||)
- */
-
 // implement the Exp interface
-func (p primary) Evaluate(env *Stmtsenv) (Obj, error) {
+func (p Primary) Evaluate(env *Stmtsenv) (Obj, error) {
 	//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
 	// operands needs to be only following string , number and boolean
-	switch p.node.Ttype {
+	switch p.Node.Ttype {
 	case scanner.NUMBER:
-		op, err := strconv.ParseFloat(p.node.Lexem, 64)
+		op, err := strconv.ParseFloat(p.Node.Lexem, 64)
 		if err != nil {
 			//handle error for failed type conversion
 			return nil, err
@@ -914,7 +761,7 @@ func (p primary) Evaluate(env *Stmtsenv) (Obj, error) {
 		return op, nil
 	//string concantenation and comparison
 	case scanner.STRING:
-		return p.node.Lexem, nil
+		return p.Node.Lexem, nil
 	//boolean algebra
 	case scanner.TRUE:
 		return true, nil
@@ -926,20 +773,20 @@ func (p primary) Evaluate(env *Stmtsenv) (Obj, error) {
 		{
 			cur := env
 			for cur != nil {
-				Obj, itExist := cur.Local[p.node.Lexem]
+				Obj, itExist := cur.Local[p.Node.Lexem]
 				if itExist {
 					return Obj, nil
 				}
 				cur = cur.Encloser
 			}
-			return nil, fmt.Errorf("Variable %s is undefined at line %d", p.node.Lexem, p.node.Line)
+			return nil, fmt.Errorf("Variable %s is undefined at line %d", p.Node.Lexem, p.Node.Line)
 		}
 	default:
-		return nil, fmt.Errorf("Expected a string, number, a target location , nil and boolean but got %d at line %d", p.node.Ttype, p.node.Line)
+		return nil, fmt.Errorf("Expected a string, number, a target location , nil and boolean but got %d at line %d", p.Node.Ttype, p.Node.Line)
 	}
 }
 
-func (u unary) Evaluate(env *Stmtsenv) (Obj, error) {
+func (u Unary) Evaluate(env *Stmtsenv) (Obj, error) {
 	Exp, err := u.right.Evaluate(env)
 	if err != nil {
 		return nil, err
@@ -962,7 +809,7 @@ func (u unary) Evaluate(env *Stmtsenv) (Obj, error) {
 	return nil, fmt.Errorf("Invalid expression")
 }
 
-func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
+func (b Binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	left, err := b.left.Evaluate(env)
 	if err != nil {
 		return nil, err
@@ -971,7 +818,7 @@ func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	if err != nil {
 		return nil, err
 	}
-	// need to handle nil expressions nil + string or string + nil or nil + 1
+	// TODO: need to handle nil expressions nil + string or string + nil or nil + 1
 	switch b.operator.Ttype {
 	case scanner.PLUS:
 		{
@@ -1136,7 +983,7 @@ func (b binary) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return nil, fmt.Errorf("Invalid expression.")
 }
-func (t logicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
+func (t LogicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
 	objL, err := t.left.Evaluate(env)
 
 	if err != nil {
@@ -1157,7 +1004,7 @@ func (t logicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return objL, nil
 }
-func (t logicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
+func (t LogicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
 	objL, err := t.left.Evaluate(env)
 	if err != nil {
 		return nil, err
@@ -1175,27 +1022,27 @@ func (t logicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return objR, nil
 }
-func (a assigment) Evaluate(env *Stmtsenv) (Obj, error) {
+func (a Assigment) Evaluate(env *Stmtsenv) (Obj, error) {
 	cur := env
-	lv, isStorageTarget := a.storeTarget.(primary)
-	if !(isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER) {
+	lv, isStorageTarget := a.StoreTarget.(Primary)
+	if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
 		return nil, fmt.Errorf("Cannot use the l-value as storage target")
 	}
 	for cur != nil {
-		_, itExist := cur.Local[lv.node.Lexem]
+		_, itExist := cur.Local[lv.Node.Lexem]
 		if itExist {
-			rv, err := a.right.Evaluate(env)
+			rv, err := a.Right.Evaluate(env)
 			if err != nil {
 				return nil, err
 			}
-			cur.Local[lv.node.Lexem] = rv
+			cur.Local[lv.Node.Lexem] = rv
 			return rv, nil
 		}
 		cur = cur.Encloser
 	}
 	return nil, fmt.Errorf("Undefined variable at line %d", a.operator.Line)
 }
-func (l list) Evaluate(env *Stmtsenv) (Obj, error) {
+func (l List) Evaluate(env *Stmtsenv) (Obj, error) {
 	var rvalue Obj
 	for index, exp := range l.expressions {
 		value, err := exp.Evaluate(env)
@@ -1208,12 +1055,12 @@ func (l list) Evaluate(env *Stmtsenv) (Obj, error) {
 	}
 	return rvalue, nil
 }
-func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
+func (t Call) Evaluate(env *Stmtsenv) (Obj, error) {
 	value, err := t.callee.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
-	function, isCallable := value.(funcDef)
+	function, isCallable := value.(FuncDef)
 	if !isCallable {
 		return nil, fmt.Errorf("Can't call expression at line %d", t.operator.Line)
 	}
@@ -1225,13 +1072,10 @@ func (t call) Evaluate(env *Stmtsenv) (Obj, error) {
 }
 
 // TODO: grammer for tenary expressions
-// TODO: grammer for grouped expression
-// TODO: implement grammer for logical operators && and ||
 // TODO: binary operators without left hand operands , report error but continue passing
 // Rule for parsing expressions into trees
 
 func (tkn Tokens) expression() (Exp, error) {
-	//
 	return tkn.list()
 }
 func (tkn Tokens) list() (Exp, error) {
@@ -1252,7 +1096,7 @@ func (tkn Tokens) list() (Exp, error) {
 				exps = append(exps, exp)
 			} else {
 				//end of list
-				return list{expressions: exps}, nil
+				return List{expressions: exps}, nil
 			}
 		}
 	}
@@ -1269,19 +1113,19 @@ func (tkn Tokens) asignment() (Exp, error) {
 	if tkn[current].Ttype == scanner.EQUAL {
 		//assigment
 		op := tkn[current]
-		//currently lv are single nodes, obviosuly identifiers
-		lv, isStorageTarget := exp.(primary)
-		if isStorageTarget && lv.node.Ttype == scanner.IDENTIFIER {
+		//currently lv are single nodes
+		lv, isStorageTarget := exp.(Primary)
+		if isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER {
 			//consume "="
 			current++
 			rv, err := tkn.asignment()
 			if err != nil {
 				return nil, err
 			}
-			ass := assigment{lv, op, rv}
+			ass := Assigment{lv, op, rv}
 			return ass, nil
 		}
-		//if i had a print method to my exp interface , i could have called it here. cool right. Maybe add this later
+		//TODO: add print method to exp interface , i could have called it here. cool right. Maybe add this later
 		return nil, fmt.Errorf("Cannot use the l-value as storage target ")
 	}
 	return exp, nil
@@ -1308,7 +1152,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				expleft = logicalOr{left: expleft, operator: op, right: expright}
+				expleft = LogicalOr{left: expleft, operator: op, right: expright}
 				continue Matching_Loop
 			}
 		}
@@ -1337,7 +1181,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				expleft = logicalAnd{left: expleft, operator: op, right: expright}
+				expleft = LogicalAnd{left: expleft, operator: op, right: expright}
 				continue Matching_Loop
 			}
 		}
@@ -1362,7 +1206,7 @@ func (tkn Tokens) equality() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			cexpleft = binary{left: cexpleft, operator: op, right: cexpright}
+			cexpleft = Binary{left: cexpleft, operator: op, right: cexpright}
 		}
 		break
 	}
@@ -1392,7 +1236,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				texpleft = binary{left: texpleft, operator: op, right: texpright}
+				texpleft = Binary{left: texpleft, operator: op, right: texpright}
 				continue Matching_Loop
 			}
 		}
@@ -1422,7 +1266,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				fexpleft = binary{left: fexpleft, operator: op, right: fexpright}
+				fexpleft = Binary{left: fexpleft, operator: op, right: fexpright}
 				continue Matching_Loop
 			}
 		}
@@ -1443,7 +1287,6 @@ func (tkn Tokens) factor() (Exp, error) {
 Matching_Loop:
 	for {
 		cToken := tkn[current]
-		//println(cToken.Ttype)
 		// find the operator terminal
 		for _, op := range opsToMatch {
 			if cToken.Ttype == op {
@@ -1454,7 +1297,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				uexpleft = binary{left: uexpleft, operator: op, right: fexpright}
+				uexpleft = Binary{left: uexpleft, operator: op, right: fexpright}
 				continue Matching_Loop
 			}
 		}
@@ -1472,7 +1315,7 @@ func (tkn Tokens) unary() (Exp, error) {
 		if err != nil {
 			return nil, err
 		}
-		return unary{operator: op, right: uexp}, nil
+		return Unary{operator: op, right: uexp}, nil
 	}
 	return tkn.call()
 }
@@ -1494,7 +1337,7 @@ Matching_Loop:
 			op := cToken
 			if tkn[current].Ttype == scanner.RIGHT_PAREN {
 				//empty
-				callee = call{arrity: 0, callee: callee, operator: op, args: nil}
+				callee = Call{arrity: 0, callee: callee, operator: op, args: nil}
 				current++
 				continue
 			}
@@ -1509,14 +1352,14 @@ Matching_Loop:
 				return nil, fmt.Errorf("ParseError: Expected a right paren but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 			}
 			args := exp
-			list, isListExp := exp.(list)
+			list, isListExp := exp.(List)
 			//TODO: assert max args
 			//TODO:check function arrity here
 			arrity := 1
 			if isListExp {
 				arrity = len(list.expressions)
 			}
-			callee = call{arrity: arrity, callee: callee, operator: op, args: args}
+			callee = Call{arrity: arrity, callee: callee, operator: op, args: args}
 			current++
 			continue Matching_Loop
 		}
@@ -1528,7 +1371,7 @@ Matching_Loop:
 // rule for producing operands
 func (tkn Tokens) primary() (Exp, error) {
 	ttype := tkn[current].Ttype
-	tnode := primary{}
+	tnode := Primary{}
 	switch ttype {
 	case scanner.IDENTIFIER:
 	case scanner.NUMBER:
@@ -1557,7 +1400,7 @@ func (tkn Tokens) primary() (Exp, error) {
 		//invalid expresion token
 		return nil, fmt.Errorf("Expected an expression token but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
 	}
-	tnode.node = tkn[current]
+	tnode.Node = tkn[current]
 	current++
 	return tnode, nil
 }
@@ -1573,5 +1416,3 @@ func isTruthy(val Obj) bool {
 	}
 	return isTruthy
 }
-
-/////////////////////////////////////////////////////end of expression rules
