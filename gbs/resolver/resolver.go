@@ -112,7 +112,15 @@ func ResolveUnary(t parser.Unary, env *parser.Stmtsenv) (ResolvedExpr, error) {
 }
 
 func ResolveBinary(t parser.Binary, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	resolvedExpLeft, err := ResolveExpr(t.Left, env)
+	if err != nil {
+		return nil, err
+	}
+	resolvedExpRight, err := ResolveExpr(t.Right, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedBinary{Left: resolvedExpLeft, Right: resolvedExpRight, Operator: t.Operator}, nil
 }
 
 func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error) {
