@@ -30,6 +30,7 @@ func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 		if err != nil {
 			return nil, err
 		}
+		env.Local[lv.Node.Lexem] = true
 		return ResolvedVarStmt{Exp: resolvedExpr}, nil
 	case parser.List:
 		//resolvedExpr, err := ResolveList(expT, env)
@@ -43,7 +44,15 @@ func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 }
 
 func ResolveBlockStmt(t parser.BlockStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	resolvedStmts := []ResolvedStmt{}
+	for _, stmt := range t.Stmts {
+		resolvedStmt, err := ResolveStmt(stmt, t.Env)
+		if err != nil {
+			return nil, err
+		}
+		resolvedStmts = append(resolvedStmts, resolvedStmt)
+	}
+	return ResolvedBlockStmt{Stmts: resolvedStmts, Env: t.Env}, nil
 }
 
 func ResolveFuncDef(t parser.FuncDef, env *parser.Stmtsenv) (ResolvedStmt, error) {
@@ -71,7 +80,11 @@ func ResolveExpStmt(t parser.ExpStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 }
 
 func ResolvePrintStmt(t parser.PrintStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	resolvedExpr, err := ResolveExpr(t.Exp, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedPrintStmt{Exp: resolvedExpr}, nil
 }
 
 func ResolveAssignment(t parser.Assignment, env *parser.Stmtsenv) (ResolvedExpr, error) {
@@ -103,7 +116,20 @@ func ResolveBinary(t parser.Binary, env *parser.Stmtsenv) (ResolvedExpr, error) 
 }
 
 func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	cur := env
+	scopeDepth := 0
+	for cur != nil {
+		_, itExist := cur.Local[t.Node.Lexem]
+		if itExist {
+			break
+		}
+		cur = cur.Encloser
+		scopeDepth++
+	}
+	if cur == nil {
+		scopeDepth = -1
+	}
+	return ResolvedPrimary{Node: t.Node, ScopeDepth: scopeDepth}, nil
 }
 
 func ResolveExpr(t parser.Exp, env *parser.Stmtsenv) (ResolvedExpr, error) {
@@ -134,7 +160,7 @@ func ResolveStmt(t parser.Stmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	case parser.VarStmt:
 		return ResolveVarStmt(t, env)
 	case parser.BlockStmt:
-		return ResolveBlockStmt(t, env)
+		return ResolveBlockStmt(t, nil)
 	case parser.ForStmt:
 		return ResolveForStmt(t, env)
 	case parser.ExpStmt:
@@ -148,5 +174,13 @@ func ResolveStmt(t parser.Stmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 }
 
 func Resolver(stmts []parser.Stmt, env *parser.Stmtsenv) ([]ResolvedStmt, error) {
-	return nil, nil
+	var resolvedStmts []ResolvedStmt
+	for _, stmt := range stmts {
+		resolvedStmt, err := ResolveStmt(stmt, env)
+		if err != nil {
+			return nil, err
+		}
+		resolvedStmts = append(resolvedStmts, resolvedStmt)
+	}
+	return resolvedStmts, nil
 }
