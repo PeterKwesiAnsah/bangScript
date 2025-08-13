@@ -103,10 +103,6 @@ func ResolveLogicalAnd(t parser.LogicalAnd, env *parser.Stmtsenv) (ResolvedExpr,
 	return nil, nil
 }
 
-func ResolveCall(t parser.Call, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
-}
-
 func ResolveUnary(t parser.Unary, env *parser.Stmtsenv) (ResolvedExpr, error) {
 	return nil, nil
 }
@@ -121,6 +117,20 @@ func ResolveBinary(t parser.Binary, env *parser.Stmtsenv) (ResolvedExpr, error) 
 		return nil, err
 	}
 	return ResolvedBinary{Left: resolvedExpLeft, Right: resolvedExpRight, Operator: t.Operator}, nil
+}
+func ResolveCall(t parser.Call, env *parser.Stmtsenv) (ResolvedExpr, error) {
+	resolvedCalleeExp, err := ResolveExpr(t.Callee, env)
+	var resolvedArgsExp ResolvedExpr
+	if err != nil {
+		return nil, err
+	}
+	if t.Args != nil {
+		resolvedArgsExp, err = ResolveExpr(t.Args, env)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ResolvedCall{Callee: resolvedCalleeExp, Args: resolvedArgsExp, Arrity: t.Arrity, Operator: t.Operator}, nil
 }
 
 func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error) {
