@@ -6,6 +6,28 @@ import (
 	"fmt"
 )
 
+const (
+	//Define ResolverFunctions
+	NONE uint32 = iota
+	VAR_STMT
+	FUNC_DEF_STMT
+	FOR_STMT
+	WHILE_STMT
+	PRINT_STMT
+	RETURN_STMT
+	EXP_STMT
+	LIST_EXP
+	ASSIGNMENT_EXP
+	LOGICAL_OR_EXP
+	LOGICAL_AND_EXP
+	BINARY_EXP
+	UNARY_EXP
+	CALL_EXP
+	PRIMARY_EXP
+)
+
+var TopOfStack uint32 = NONE
+
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	switch expT := t.Exp.(type) {
 	case parser.Primary:
