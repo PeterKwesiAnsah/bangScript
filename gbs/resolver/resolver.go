@@ -2,9 +2,13 @@ package resolver
 
 import (
 	"bangScript/gbs/parser"
-	"bangScript/gbs/scanner"
 	"fmt"
 )
+
+type VariableMetaData struct {
+	isUsed     bool
+	isResolved bool
+}
 
 const (
 	//Define ResolverFunctions
@@ -16,17 +20,9 @@ const (
 	PRINT_STMT
 	RETURN_STMT
 	EXP_STMT
-	LIST_EXP
-	ASSIGNMENT_EXP
-	LOGICAL_OR_EXP
-	LOGICAL_AND_EXP
-	BINARY_EXP
-	UNARY_EXP
-	CALL_EXP
-	PRIMARY_EXP
 )
 
-var TopOfStack uint32 = NONE
+var TopOfCallStack uint32 = NONE
 
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	switch expT := t.Exp.(type) {
@@ -36,33 +32,30 @@ func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 		if itExists {
 			return nil, fmt.Errorf("Cannot redeclare a variable in the same scope.")
 		}
-		env.Local[lexeme] = true
+		env.Local[lexeme] = VariableMetaData{isUsed: false, isResolved: false}
 		//-1 because it binds a variable to the current scope
 		return ResolvedVarStmt{Exp: ResolvedPrimary{Node: expT.Node, ScopeDepth: -1}}, nil
 	case parser.Assignment:
-		lv, isStorageTarget := expT.StoreTarget.(parser.Primary)
-		if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
-			return nil, fmt.Errorf("Cannot use the l-value as storage target")
-		}
-		rv, isPrimaryExpression := expT.Right.(parser.Primary)
-		if isPrimaryExpression && rv.Node.Lexem == lv.Node.Lexem {
-			return nil, fmt.Errorf("Cannot initizialize a variable using the same variable being declared")
-		}
+		lv := expT.StoreTarget.(parser.Primary)
+		//rv := expT.Right.(parser.Primary)
+		//if rv.Node.Lexem == lv.Node.Lexem {
+		//TODO: return nil, fmt.Errorf("Cannot initizialize a variable using the same variable being declared")
+		//}
 		resolvedExpr, err := ResolveExpr(expT.Right, env)
 		if err != nil {
 			return nil, err
 		}
-		env.Local[lv.Node.Lexem] = true
+		env.Local[lv.Node.Lexem] = VariableMetaData{isUsed: false, isResolved: false}
 		return ResolvedVarStmt{Exp: resolvedExpr}, nil
 	case parser.List:
-		//resolvedExpr, err := ResolveList(expT, env)
-		//if err != nil {
-		//	return nil, err
-		//}
+		resolvedExpr, err := ResolveList(expT, env)
+		if err != nil {
+			return nil, err
+		}
+		return ResolvedVarStmt{Exp: resolvedExpr}, nil
 	default:
 		return nil, fmt.Errorf("Invalid expression type")
 	}
-	return nil, nil
 }
 
 func ResolveBlockStmt(t parser.BlockStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
@@ -102,31 +95,81 @@ func ResolveExpStmt(t parser.ExpStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 }
 
 func ResolvePrintStmt(t parser.PrintStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
+	caller := TopOfCallStack
 	resolvedExpr, err := ResolveExpr(t.Exp, env)
 	if err != nil {
 		return nil, err
 	}
+	TopOfCallStack = caller
 	return ResolvedPrintStmt{Exp: resolvedExpr}, nil
 }
 
 func ResolveAssignment(t parser.Assignment, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	resolveStorageTarget, err := ResolveExpr(t.StoreTarget, env)
+	if err != nil {
+		return nil, err
+	}
+	resolveValue, err := ResolveExpr(t.Right, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedAssignment{StoreTarget: resolveStorageTarget, Right: resolveValue, Operator: t.Operator}, nil
 }
 
 func ResolveList(t parser.List, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	caller := TopOfCallStack
+	resolvedExps := []ResolvedExpr{}
+	for _, expr := range t.Expressions {
+		if caller == VAR_STMT {
+			varStmt := parser.VarStmt{Exp: expr}
+			resolvedStmt, err := ResolveVarStmt(varStmt, env)
+			if err != nil {
+				return nil, err
+			}
+			resolvedVarStmt := resolvedStmt.(ResolvedVarStmt)
+			resolvedExps = append(resolvedExps, resolvedVarStmt.Exp)
+			continue
+		}
+		resolvedItem, err := ResolveExpr(expr, env)
+		if err != nil {
+			return nil, err
+		}
+		resolvedExps = append(resolvedExps, resolvedItem)
+	}
+	TopOfCallStack = caller
+	return ResolvedList{Expressions: resolvedExps}, nil
 }
 
 func ResolveLogicalOr(t parser.LogicalOr, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	resolvedExpLeft, err := ResolveExpr(t.Left, env)
+	if err != nil {
+		return nil, err
+	}
+	resolvedExpRight, err := ResolveExpr(t.Right, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedLogicalOr{Left: resolvedExpLeft, Right: resolvedExpRight, Operator: t.Operator}, nil
 }
 
 func ResolveLogicalAnd(t parser.LogicalAnd, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	resolvedExpLeft, err := ResolveExpr(t.Left, env)
+	if err != nil {
+		return nil, err
+	}
+	resolvedExpRight, err := ResolveExpr(t.Right, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedLogicalAnd{Left: resolvedExpLeft, Right: resolvedExpRight, Operator: t.Operator}, nil
 }
 
 func ResolveUnary(t parser.Unary, env *parser.Stmtsenv) (ResolvedExpr, error) {
-	return nil, nil
+	resolvedExp, err := ResolveExpr(t.Right, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedUnary{Operator: t.Operator, Right: resolvedExp}, nil
 }
 
 func ResolveBinary(t parser.Binary, env *parser.Stmtsenv) (ResolvedExpr, error) {
