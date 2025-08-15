@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"bangScript/gbs/parser"
+	"bangScript/gbs/scanner"
 	"fmt"
 )
 
@@ -200,17 +201,21 @@ func ResolveCall(t parser.Call, env *parser.Stmtsenv) (ResolvedExpr, error) {
 
 func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error) {
 	cur := env
-	scopeDepth := 0
-	for cur != nil {
-		_, itExist := cur.Local[t.Node.Lexem]
-		if itExist {
-			break
+	scopeDepth := 1
+	if t.Node.Ttype == scanner.IDENTIFIER {
+		for cur != nil {
+			_, itExist := cur.Local[t.Node.Lexem]
+			if itExist {
+				break
+			}
+			cur = cur.Encloser
+			scopeDepth++
 		}
-		cur = cur.Encloser
-		scopeDepth++
+	} else {
+		scopeDepth = -1
 	}
 	if cur == nil {
-		scopeDepth = -1
+		scopeDepth = 0
 	}
 	return ResolvedPrimary{Node: t.Node, ScopeDepth: scopeDepth}, nil
 }
