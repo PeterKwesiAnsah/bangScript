@@ -21,11 +21,14 @@ const (
 	PRINT_STMT
 	RETURN_STMT
 	EXP_STMT
+	DESTINATION_ASSIGNMENT
 )
 
 var TopOfCallStack uint32 = NONE
 
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
+	caller := TopOfCallStack
+	TopOfCallStack = VAR_STMT
 	switch expT := t.Exp.(type) {
 	case parser.Primary:
 		lexeme := expT.Node.Lexem
@@ -33,8 +36,9 @@ func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 		if itExists {
 			return nil, fmt.Errorf("Cannot redeclare a variable in the same scope.")
 		}
+		//is initializer present??
 		env.Local[lexeme] = VariableMetaData{isUsed: false, isResolved: false}
-		//-1 because it binds a variable to the current scope
+		TopOfCallStack = caller
 		return ResolvedVarStmt{Exp: ResolvedPrimary{Node: expT.Node, ScopeDepth: -1}}, nil
 	case parser.Assignment:
 		lv := expT.StoreTarget.(parser.Primary)
@@ -46,13 +50,15 @@ func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 		if err != nil {
 			return nil, err
 		}
-		env.Local[lv.Node.Lexem] = VariableMetaData{isUsed: false, isResolved: false}
+		env.Local[lv.Node.Lexem] = VariableMetaData{isUsed: false, isResolved: true}
+		TopOfCallStack = caller
 		return ResolvedVarStmt{Exp: resolvedExpr}, nil
 	case parser.List:
 		resolvedExpr, err := ResolveList(expT, env)
 		if err != nil {
 			return nil, err
 		}
+		TopOfCallStack = caller
 		return ResolvedVarStmt{Exp: resolvedExpr}, nil
 	default:
 		return nil, fmt.Errorf("Invalid expression type")
@@ -106,10 +112,13 @@ func ResolvePrintStmt(t parser.PrintStmt, env *parser.Stmtsenv) (ResolvedStmt, e
 }
 
 func ResolveAssignment(t parser.Assignment, env *parser.Stmtsenv) (ResolvedExpr, error) {
+	caller := TopOfCallStack
+	TopOfCallStack = DESTINATION_ASSIGNMENT
 	resolveStorageTarget, err := ResolveExpr(t.StoreTarget, env)
 	if err != nil {
 		return nil, err
 	}
+	TopOfCallStack = caller
 	resolveValue, err := ResolveExpr(t.Right, env)
 	if err != nil {
 		return nil, err
@@ -206,15 +215,20 @@ func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error
 		for cur != nil {
 			_, itExist := cur.Local[t.Node.Lexem]
 			if itExist {
+				//for a variable to be used in a scope , it needs to appear at the left hand side of an assignment/either sides of a binary expression/one side of a unary expression
+				// // basically if it appears to be storage target/destination is not being used other than that is being used.
+				//update variable metadata isUsed
 				break
 			}
 			cur = cur.Encloser
 			scopeDepth++
 		}
 	} else {
+		//scope Depth does not apply to literals/variables declared
 		scopeDepth = -1
 	}
 	if cur == nil {
+		//not defined
 		scopeDepth = 0
 	}
 	return ResolvedPrimary{Node: t.Node, ScopeDepth: scopeDepth}, nil

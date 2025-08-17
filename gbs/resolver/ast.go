@@ -71,18 +71,18 @@ type ResolvedPrimary struct {
 }
 
 type ResolvedIfStmt struct {
-	condition ResolvedExpr
-	thenbody  ResolvedStmt
-	elsebody  ResolvedStmt
+	Condition ResolvedExpr
+	Thenbody  ResolvedStmt
+	Elsebody  ResolvedStmt
 }
 type ResolvedForStmt struct {
-	stmt ResolvedWhileStmt
+	Stmt ResolvedWhileStmt
 }
 type ResolvedWhileStmt struct {
-	condition ResolvedExpr
-	body      ResolvedBlockStmt
-	init      ResolvedStmt
-	env       *parser.Stmtsenv
+	Condition ResolvedExpr
+	Body      ResolvedBlockStmt
+	Init      ResolvedStmt
+	Env       *parser.Stmtsenv
 }
 
 type ResolvedBlockStmt struct {
@@ -98,14 +98,14 @@ type ResolvedPrintStmt struct {
 }
 
 type ResolvedExpStmt struct {
-	exp ResolvedExpr
+	Exp ResolvedExpr
 }
 
 type ResolvedFuncDef struct {
-	name   *scanner.Token
-	params []*scanner.Token
-	body   ResolvedBlockStmt
-	arrity int
+	Name   *scanner.Token
+	Params []*scanner.Token
+	Body   ResolvedBlockStmt
+	Arrity int
 }
 
 type ResolvedReturnStmt struct {
@@ -113,13 +113,28 @@ type ResolvedReturnStmt struct {
 	Exp ResolvedExpr
 }
 
+func (t ResolvedFuncDef) execute() error {
+	return nil
+}
 func (t ResolvedVarStmt) execute() error {
 	return nil
 }
 func (t ResolvedPrintStmt) execute() error {
 	return nil
 }
+func (t ResolvedExpStmt) execute() error {
+	return nil
+}
+func (t ResolvedForStmt) execute() error {
+	return nil
+}
+func (t ResolvedWhileStmt) execute() error {
+	return nil
+}
 func (t ResolvedBlockStmt) execute() error {
+	return nil
+}
+func (t ResolvedIfStmt) execute() error {
 	return nil
 }
 func (t ResolvedList) evaluate() error {
