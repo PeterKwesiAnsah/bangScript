@@ -42,10 +42,6 @@ func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 		return ResolvedVarStmt{Exp: ResolvedPrimary{Node: expT.Node, ScopeDepth: -1}}, nil
 	case parser.Assignment:
 		lv := expT.StoreTarget.(parser.Primary)
-		//rv := expT.Right.(parser.Primary)
-		//if rv.Node.Lexem == lv.Node.Lexem {
-		//TODO: return nil, fmt.Errorf("Cannot initizialize a variable using the same variable being declared")
-		//}
 		resolvedExpr, err := ResolveExpr(expT.Right, env)
 		if err != nil {
 			return nil, err
@@ -78,7 +74,22 @@ func ResolveBlockStmt(t parser.BlockStmt, env *parser.Stmtsenv) (ResolvedStmt, e
 }
 
 func ResolveFuncDef(t parser.FuncDef, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	caller := TopOfCallStack
+	TopOfCallStack = FUNC_DEF_STMT
+
+	for _, param := range t.Params {
+		if param.Ttype != scanner.IDENTIFIER {
+			return nil, fmt.Errorf("Function parameters need to be identifiers")
+		}
+		t.Body.Env.Local[param.Lexem] = VariableMetaData{isUsed: false, isResolved: true}
+	}
+	resolvedStmt, err := ResolveBlockStmt(t.Body, nil)
+	if err != nil {
+		return nil, err
+	}
+	resolvedBs := resolvedStmt.(ResolvedBlockStmt)
+	TopOfCallStack = caller
+	return ResolvedFuncDef{Name: t.Name, Params: t.Params, Body: resolvedBs, Arrity: t.Arrity}, nil
 }
 
 func ResolveReturnStmt(t parser.ReturnStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
@@ -86,19 +97,60 @@ func ResolveReturnStmt(t parser.ReturnStmt, env *parser.Stmtsenv) (ResolvedStmt,
 }
 
 func ResolveIfStmt(t parser.IfStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	var resolveElse ResolvedStmt
+	var err error
+	resolveCondition, err := ResolveExpr(t.Condition, env)
+	if err != nil {
+		return nil, err
+	}
+	resolveThen, err := ResolveStmt(t.Thenbody, env)
+	if err != nil {
+		return nil, err
+	}
+	if t.Elsebody != nil {
+		resolveElse, err = ResolveStmt(t.Elsebody, env)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ResolvedIfStmt{Condition: resolveCondition, Thenbody: resolveThen, Elsebody: resolveElse}, nil
 }
 
 func ResolveWhileStmt(t parser.WhileStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	var resolvedInit ResolvedStmt
+	var resolvedCondition ResolvedExpr
+	var resolvedBody ResolvedStmt
+	var err error
+	if t.Init != nil {
+		resolvedInit, err = ResolveStmt(t.Init, t.Env)
+	}
+	if t.Condition != nil {
+		resolvedCondition, err = ResolveExpr(t.Condition, t.Env)
+	}
+	resolvedBody, err = ResolveStmt(t.Body, nil)
+	if err != nil {
+		return nil, err
+	}
+	//runtime type checking...definitely incur some cycles
+	resolvedBs := resolvedBody.(ResolvedBlockStmt)
+	return ResolvedWhileStmt{Condition: resolvedCondition, Body: resolvedBs, Env: t.Env, Init: resolvedInit}, nil
 }
 
 func ResolveForStmt(t parser.ForStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	resolvedStmt, err := ResolveWhileStmt(t.Stmt, nil)
+	if err != nil {
+		return nil, err
+	}
+	resolvedWs := resolvedStmt.(ResolvedWhileStmt)
+	return ResolvedForStmt{Stmt: resolvedWs}, nil
 }
 
 func ResolveExpStmt(t parser.ExpStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	resolvedExp, err := ResolveExpr(t.Exp, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedExpStmt{Exp: resolvedExp}, nil
 }
 
 func ResolvePrintStmt(t parser.PrintStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
@@ -217,7 +269,13 @@ func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error
 			if itExist {
 				//for a variable to be used in a scope , it needs to appear at the left hand side of an assignment/either sides of a binary expression/one side of a unary expression
 				// // basically if it appears to be storage target/destination is not being used other than that is being used.
+<<<<<<< Updated upstream
 				//update variable metadata isUsed
+=======
+				if TopOfCallStack != DESTINATION_ASSIGNMENT {
+					cur.Local[t.Node.Lexem] = VariableMetaData{isUsed: true, isResolved: false}
+				}
+>>>>>>> Stashed changes
 				break
 			}
 			cur = cur.Encloser
