@@ -269,18 +269,13 @@ func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error
 			if itExist {
 				//for a variable to be used in a scope , it needs to appear at the left hand side of an assignment/either sides of a binary expression/one side of a unary expression
 				// // basically if it appears to be storage target/destination is not being used other than that is being used.
-<<<<<<< Updated upstream
-				//update variable metadata isUsed
-=======
-				if TopOfCallStack != DESTINATION_ASSIGNMENT {
-					cur.Local[t.Node.Lexem] = VariableMetaData{isUsed: true, isResolved: false}
-				}
->>>>>>> Stashed changes
-				break
+				//update variable metadata isUsed		if TopOfCallStack != DESTINATION_ASSIGNMENT {
+				cur.Local[t.Node.Lexem] = VariableMetaData{isUsed: true, isResolved: false}
 			}
-			cur = cur.Encloser
-			scopeDepth++
+			break
 		}
+		cur = cur.Encloser
+		scopeDepth++
 	} else {
 		//scope Depth does not apply to literals/variables declared
 		scopeDepth = -1
@@ -321,8 +316,12 @@ func ResolveStmt(t parser.Stmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 		return ResolveVarStmt(t, env)
 	case parser.BlockStmt:
 		return ResolveBlockStmt(t, nil)
+	case parser.WhileStmt:
+		return ResolveWhileStmt(t, nil)
+	case parser.FuncDef:
+		return ResolveFuncDef(t, nil)
 	case parser.ForStmt:
-		return ResolveForStmt(t, env)
+		return ResolveForStmt(t, nil)
 	case parser.ExpStmt:
 		return ResolveExpStmt(t, env)
 	case parser.PrintStmt:
