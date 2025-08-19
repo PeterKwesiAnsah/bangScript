@@ -57,70 +57,76 @@ var current int = 0
 var cs CallStack = CallStack{}
 var mode uint8 = REPL
 
+func (t *Stmtsenv) Get(depth int) *Stmtsenv {
+	for range depth - 1 {
+		t = t.Encloser
+	}
+	return t
+}
 func (t *ForStmt) StaticToDynamic(parent *Stmtsenv) error {
-	//t.stmt.env is environment for condition,initializer and single body statement
-	if t.stmt.env == parent {
+	//t.stmt.Env is environment for condition,initializer and single body statement
+	if t.Stmt.Env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
 	if parent.Policy == DYNAMIC {
 		//condition,initializer and single body statement
 		newEnv := &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
-		if t.stmt.env == t.stmt.body.env {
-			t.stmt.env = newEnv
-			t.stmt.body.env = newEnv
+		if t.Stmt.Env == t.Stmt.Body.Env {
+			t.Stmt.Env = newEnv
+			t.Stmt.Body.Env = newEnv
 		} else {
-			t.stmt.env = newEnv
-			t.stmt.body.StaticToDynamic(newEnv)
+			t.Stmt.Env = newEnv
+			t.Stmt.Body.StaticToDynamic(newEnv)
 		}
 	} else {
-		if t.stmt.env.Encloser != parent {
+		if t.Stmt.Env.Encloser != parent {
 			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
 		}
 	}
 	return nil
 }
 func (t *FuncDef) StaticToDynamic(parent *Stmtsenv) error {
-	if t.body.env == parent {
+	if t.Body.Env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
 	if parent.Policy == DYNAMIC {
-		t.body.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
+		t.Body.Env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
 	} else {
-		if t.body.env.Encloser != parent {
+		if t.Body.Env.Encloser != parent {
 			return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
 		}
 	}
 	return nil
 }
 func (t *BlockStmt) StaticToDynamic(parent *Stmtsenv) error {
-	if t.env == parent {
+	if t.Env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
 	if parent.Policy == DYNAMIC {
-		t.env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
+		t.Env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
 	} else {
-		if t.env.Encloser != parent {
+		if t.Env.Encloser != parent {
 			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
 		}
 	}
 	return nil
 }
 func (t *WhileStmt) StaticToDynamic(parent *Stmtsenv) error {
-	if t.env == parent {
+	if t.Env == parent {
 		return fmt.Errorf("Child environment can not be the same as Parent")
 	}
 	if parent.Policy == DYNAMIC {
 		//condition,initializer and single body statement
 		newEnv := &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
-		if t.env == t.body.env {
-			t.env = newEnv
-			t.body.env = newEnv
+		if t.Env == t.Body.Env {
+			t.Env = newEnv
+			t.Body.Env = newEnv
 		} else {
-			t.env = newEnv
-			t.body.StaticToDynamic(newEnv)
+			t.Env = newEnv
+			t.Body.StaticToDynamic(newEnv)
 		}
 	} else {
-		if t.env.Encloser != parent {
+		if t.Env.Encloser != parent {
 			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
 		}
 	}
@@ -203,14 +209,14 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		return nil, fmt.Errorf("ParseError: Expected a right brace but got EOF at line %d", tkn[current].Line)
 	}
 	current++
-	stmt.stmts = stmts
-	stmt.env = &inner
+	stmt.Stmts = stmts
+	stmt.Env = &inner
 
 	return FuncDef{
-		arrity: len(params),
-		name:   name,
-		body:   stmt,
-		params: params,
+		Arrity: len(params),
+		Name:   name,
+		Body:   stmt,
+		Params: params,
 	}, nil
 }
 
@@ -218,13 +224,13 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 // func (t FuncDef) Evaluate(env *Stmtsenv) (Obj, error)
 // bind function name to it's value in env.
 func (t FuncDef) Execute(env *Stmtsenv) error {
-	bs := t.body
-	bs.env.Encloser.Local[t.name.Lexem] = t
+	bs := t.Body
+	bs.Env.Encloser.Local[t.Name.Lexem] = t
 	return nil
 }
 
 func (t FuncDef) call(env *Stmtsenv, callStack *CallStack, callInfo *Call) (value Obj, err error) {
-	bs := t.body
+	bs := t.Body
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -237,33 +243,33 @@ func (t FuncDef) call(env *Stmtsenv, callStack *CallStack, callInfo *Call) (valu
 		}
 	}()
 
-	//bs.env need to be a complete copy, since it's new, any environment that once enclosed around bs.env will be updated to support closures
-	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.env.Encloser, Policy: DYNAMIC}
-	bs.env = &newEnv
+	//bs.Env need to be a complete copy, since it's new, any environment that once enclosed around bs.Env will be updated to support closures
+	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.Env.Encloser, Policy: DYNAMIC}
+	bs.Env = &newEnv
 
 	envWithFunctionArgsOnly := newEnv.Local
-	if callInfo.args != nil {
-		listArgs, isArgs := callInfo.args.(List)
+	if callInfo.Args != nil {
+		listArgs, isArgs := callInfo.Args.(List)
 		if isArgs {
-			for argI, exp := range listArgs.expressions {
+			for argI, exp := range listArgs.Expressions {
 				value, err := exp.Evaluate(env)
 				if err != nil {
 					return nil, err
 				}
-				envWithFunctionArgsOnly[t.params[argI].Lexem] = value
+				envWithFunctionArgsOnly[t.Params[argI].Lexem] = value
 			}
 		} else {
-			value, err := callInfo.args.Evaluate(env)
+			value, err := callInfo.Args.Evaluate(env)
 			if err != nil {
 				return nil, err
 			}
-			envWithFunctionArgsOnly[t.params[0].Lexem] = value
+			envWithFunctionArgsOnly[t.Params[0].Lexem] = value
 		}
 	}
 	cs = append(cs, &CallDetails{
-		args: callInfo.args,
-		at:   callInfo.operator.Line,
-		name: t.name.Lexem,
+		args: callInfo.Args,
+		at:   callInfo.Operator.Line,
+		name: t.Name.Lexem,
 	})
 	//the reason why we pass nil is that , we have already created the environments during parsing and each block has it
 	// what we make fresh copies of environment during function calls, and update subsequent environments in the function as they too are dynamic
@@ -276,7 +282,7 @@ func (t FuncDef) call(env *Stmtsenv, callStack *CallStack, callInfo *Call) (valu
 }
 
 func (t ForStmt) Execute(parent *Stmtsenv) error {
-	return t.stmt.Execute(nil)
+	return t.Stmt.Execute(nil)
 }
 
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
@@ -330,8 +336,8 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	}
 	// empty body statement
 	if tkn[current].Ttype == scanner.SEMICOLON {
-		return ForStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
-			body: BlockStmt{stmts: []Stmt{ExpStmt{exp: sideEffect}}, env: &whileScope}}}, nil
+		return ForStmt{Stmt: WhileStmt{Condition: condition, Init: initializer, Env: &whileScope,
+			Body: BlockStmt{Stmts: []Stmt{ExpStmt{Exp: sideEffect}}, Env: &whileScope}}}, nil
 	}
 	body, err = tkn.declarations(&whileScope)
 	if err != nil {
@@ -340,14 +346,14 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 	//block body statement
 	bs, isBS := body.(BlockStmt)
 	if isBS {
-		stmts := bs.stmts
-		stmts = append(stmts, ExpStmt{exp: sideEffect})
-		return ForStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope, body: BlockStmt{stmts: stmts, env: bs.env}}}, nil
+		stmts := bs.Stmts
+		stmts = append(stmts, ExpStmt{Exp: sideEffect})
+		return ForStmt{Stmt: WhileStmt{Condition: condition, Init: initializer, Env: &whileScope, Body: BlockStmt{Stmts: stmts, Env: bs.Env}}}, nil
 	} else {
 		//single statement body
-		return ForStmt{stmt: WhileStmt{condition: condition, init: initializer, env: &whileScope,
-			body: BlockStmt{stmts: []Stmt{body, ExpStmt{exp: sideEffect}},
-				env: &whileScope}}}, nil
+		return ForStmt{Stmt: WhileStmt{Condition: condition, Init: initializer, Env: &whileScope,
+			Body: BlockStmt{Stmts: []Stmt{body, ExpStmt{Exp: sideEffect}},
+				Env: &whileScope}}}, nil
 	}
 }
 
@@ -359,9 +365,9 @@ func (t WhileStmt) Execute(env *Stmtsenv) error {
 	if env != nil {
 		return fmt.Errorf("Block statements does not need the caller's env")
 	}
-	if t.init != nil {
+	if t.Init != nil {
 		//init is neither a while stmt or a block stmt
-		executionErr = t.init.Execute(t.env)
+		executionErr = t.Init.Execute(t.Env)
 		if executionErr != nil {
 			return executionErr
 		}
@@ -370,7 +376,7 @@ func (t WhileStmt) Execute(env *Stmtsenv) error {
 executeBody:
 	{
 		//creating new environment per iteration??
-		executionErr = t.body.Execute(nil)
+		executionErr = t.Body.Execute(nil)
 		if executionErr != nil {
 			return executionErr
 		}
@@ -378,10 +384,10 @@ executeBody:
 	}
 evaluateAndtest:
 	//infinite loop equivalent to while(true)
-	if t.condition == nil {
+	if t.Condition == nil {
 		goto executeBody
 	}
-	obj, evalErr := t.condition.Evaluate(t.env)
+	obj, evalErr := t.Condition.Evaluate(t.Env)
 	if evalErr != nil {
 		return evalErr
 	}
@@ -414,19 +420,19 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return WhileStmt{condition: cond, body: bs, env: Encloser}, nil
+	return WhileStmt{Condition: cond, Body: bs, Env: Encloser}, nil
 }
 
 func (t IfStmt) Execute(env *Stmtsenv) error {
 
-	obj, err := t.condition.Evaluate(env)
+	obj, err := t.Condition.Evaluate(env)
 	if err != nil {
 		return err
 	}
 	isTruth := isTruthy(obj)
 
 	if isTruth {
-		switch s := t.thenbody.(type) {
+		switch s := t.Thenbody.(type) {
 		case WhileStmt:
 			err = s.StaticToDynamic(env)
 			if err != nil {
@@ -458,10 +464,10 @@ func (t IfStmt) Execute(env *Stmtsenv) error {
 			return err
 		}
 	} else {
-		if t.elsebody == nil {
+		if t.Elsebody == nil {
 			return nil
 		}
-		switch s := t.elsebody.(type) {
+		switch s := t.Elsebody.(type) {
 		case WhileStmt:
 			err = s.StaticToDynamic(env)
 			if err != nil {
@@ -522,13 +528,13 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 			return nil, err
 		}
 	}
-	return IfStmt{condition: condexp, thenbody: stmtBody, elsebody: elseStmt}, nil
+	return IfStmt{Condition: condexp, Thenbody: stmtBody, Elsebody: elseStmt}, nil
 }
 
 func (t BlockStmt) Execute(env *Stmtsenv) error {
 
 	//isDynamic := env != nil
-	for _, stmt := range t.stmts {
+	for _, stmt := range t.Stmts {
 		if stmt == nil {
 			continue
 		}
@@ -536,31 +542,31 @@ func (t BlockStmt) Execute(env *Stmtsenv) error {
 		var err error
 		switch s := stmt.(type) {
 		case WhileStmt:
-			err = s.StaticToDynamic(t.env)
+			err = s.StaticToDynamic(t.Env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
 		case BlockStmt:
-			err = s.StaticToDynamic(t.env)
+			err = s.StaticToDynamic(t.Env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
 		case FuncDef:
-			err = s.StaticToDynamic(t.env)
+			err = s.StaticToDynamic(t.Env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
 		case ForStmt:
-			err = s.StaticToDynamic(t.env)
+			err = s.StaticToDynamic(t.Env)
 			if err != nil {
 				return err
 			}
 			err = s.Execute(nil)
 		default:
-			err = s.Execute(t.env)
+			err = s.Execute(t.Env)
 		}
 		if err != nil {
 			return err
@@ -586,13 +592,13 @@ func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
 		return nil, fmt.Errorf("ParseError: Expected a right brace but got EOF at line %d", tkn[current].Line)
 	}
 	current++
-	stmt.stmts = stmts
-	stmt.env = &inner
+	stmt.Stmts = stmts
+	stmt.Env = &inner
 	return stmt, nil
 }
 
 func (t PrintStmt) Execute(env *Stmtsenv) error {
-	Obj, err := t.exp.Evaluate(env)
+	Obj, err := t.Exp.Evaluate(env)
 	if err != nil {
 		return err
 	}
@@ -606,7 +612,7 @@ func (tkn Tokens) printStmt() (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt.exp = exp
+	stmt.Exp = exp
 	//expect a ";" terminator
 	if tkn[current].Ttype != scanner.SEMICOLON {
 		return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
@@ -621,7 +627,7 @@ func (t VarStmt) Execute(env *Stmtsenv) error {
 		switch s := t.Exp.(type) {
 		case Primary:
 			env.Local[s.Node.Lexem] = nil
-		case Assigment:
+		case Assignment:
 			//for now only primary identifier expressions map to a storage location
 			lv, isStorageTarget := s.StoreTarget.(Primary)
 			if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
@@ -633,8 +639,8 @@ func (t VarStmt) Execute(env *Stmtsenv) error {
 			}
 			env.Local[lv.Node.Lexem] = obj
 		case List:
-			for _, exp := range s.expressions {
-				err := VarStmt{nil, exp}.Execute(env)
+			for _, exp := range s.Expressions {
+				err := VarStmt{exp}.Execute(env)
 				if err != nil {
 					return err
 				}
@@ -661,7 +667,7 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 }
 
 func (t ExpStmt) Execute(env *Stmtsenv) error {
-	obj, err := t.exp.Evaluate(env)
+	obj, err := t.Exp.Evaluate(env)
 	if err != nil {
 		return err
 	}
@@ -677,7 +683,7 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt.exp = exp
+	stmt.Exp = exp
 	//expect a ";" terminator only for script mode
 	if mode == REPL {
 		if tkn[current].Ttype == scanner.SEMICOLON {
@@ -787,39 +793,39 @@ func (p Primary) Evaluate(env *Stmtsenv) (Obj, error) {
 }
 
 func (u Unary) Evaluate(env *Stmtsenv) (Obj, error) {
-	Exp, err := u.right.Evaluate(env)
+	Exp, err := u.Right.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
-	operator := u.operator.Ttype
+	operator := u.Operator.Ttype
 
 	if operator == scanner.BANG {
 		bol, isbol := Exp.(bool)
 		if isbol {
 			return !bol, nil
 		}
-		return nil, fmt.Errorf("Expected a boolean value but got something else at line %d", u.operator.Line)
+		return nil, fmt.Errorf("Expected a boolean value but got something else at line %d", u.Operator.Line)
 	} else if operator == scanner.MINUS {
 		num, isnum := Exp.(float64)
 		if isnum {
 			return -num, nil
 		}
-		return nil, fmt.Errorf("Expected a number value but got something else at line %d", u.operator.Line)
+		return nil, fmt.Errorf("Expected a number value but got something else at line %d", u.Operator.Line)
 	}
 	return nil, fmt.Errorf("Invalid expression")
 }
 
 func (b Binary) Evaluate(env *Stmtsenv) (Obj, error) {
-	left, err := b.left.Evaluate(env)
+	left, err := b.Left.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
-	right, err := b.right.Evaluate(env)
+	right, err := b.Right.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
 	// TODO: need to handle nil expressions nil + string or string + nil or nil + 1
-	switch b.operator.Ttype {
+	switch b.Operator.Ttype {
 	case scanner.PLUS:
 		{
 			//string concatenation
@@ -828,7 +834,7 @@ func (b Binary) Evaluate(env *Stmtsenv) (Obj, error) {
 			if okLeft {
 				strRight, okRight := right.(string)
 				if !okRight {
-					return nil, fmt.Errorf("Invalid Right operand, expected a string at line %d", b.operator.Line)
+					return nil, fmt.Errorf("Invalid Right operand, expected a string at line %d", b.Operator.Line)
 				}
 				return strLeft + strRight, nil
 			}
@@ -837,7 +843,7 @@ func (b Binary) Evaluate(env *Stmtsenv) (Obj, error) {
 			if okLeft {
 				floatRight, okRight := right.(float64)
 				if !okRight {
-					return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.operator.Line)
+					return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.Operator.Line)
 				}
 				return floatLeft + floatRight, nil
 			}
@@ -977,14 +983,14 @@ func (b Binary) Evaluate(env *Stmtsenv) (Obj, error) {
 		}
 	default:
 		{
-			return nil, fmt.Errorf("Invalid operator at line %d.", b.operator.Line)
+			return nil, fmt.Errorf("Invalid operator at line %d.", b.Operator.Line)
 		}
 
 	}
 	return nil, fmt.Errorf("Invalid expression.")
 }
 func (t LogicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
-	objL, err := t.left.Evaluate(env)
+	objL, err := t.Left.Evaluate(env)
 
 	if err != nil {
 		return nil, err
@@ -994,7 +1000,7 @@ func (t LogicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
 	if !isTrueL {
 		return objL, nil
 	}
-	objR, err := t.right.Evaluate(env)
+	objR, err := t.Right.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,7 +1011,7 @@ func (t LogicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
 	return objL, nil
 }
 func (t LogicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
-	objL, err := t.left.Evaluate(env)
+	objL, err := t.Left.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
@@ -1015,14 +1021,14 @@ func (t LogicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
 	if isTrueL {
 		return objL, nil
 	}
-	objR, err := t.right.Evaluate(env)
+	objR, err := t.Right.Evaluate(env)
 
 	if err != nil {
 		return nil, err
 	}
 	return objR, nil
 }
-func (a Assigment) Evaluate(env *Stmtsenv) (Obj, error) {
+func (a Assignment) Evaluate(env *Stmtsenv) (Obj, error) {
 	cur := env
 	lv, isStorageTarget := a.StoreTarget.(Primary)
 	if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
@@ -1040,32 +1046,32 @@ func (a Assigment) Evaluate(env *Stmtsenv) (Obj, error) {
 		}
 		cur = cur.Encloser
 	}
-	return nil, fmt.Errorf("Undefined variable at line %d", a.operator.Line)
+	return nil, fmt.Errorf("Undefined variable at line %d", a.Operator.Line)
 }
 func (l List) Evaluate(env *Stmtsenv) (Obj, error) {
 	var rvalue Obj
-	for index, exp := range l.expressions {
+	for index, exp := range l.Expressions {
 		value, err := exp.Evaluate(env)
 		if err != nil {
 			return nil, err
 		}
-		if (index + 1) == len(l.expressions) {
+		if (index + 1) == len(l.Expressions) {
 			rvalue = value
 		}
 	}
 	return rvalue, nil
 }
 func (t Call) Evaluate(env *Stmtsenv) (Obj, error) {
-	value, err := t.callee.Evaluate(env)
+	value, err := t.Callee.Evaluate(env)
 	if err != nil {
 		return nil, err
 	}
 	function, isCallable := value.(FuncDef)
 	if !isCallable {
-		return nil, fmt.Errorf("Can't call expression at line %d", t.operator.Line)
+		return nil, fmt.Errorf("Can't call expression at line %d", t.Operator.Line)
 	}
-	if t.arrity != function.arrity {
-		return nil, fmt.Errorf("Expected %d arguments but got %d instead", function.arrity, t.arrity)
+	if t.Arrity != function.Arrity {
+		return nil, fmt.Errorf("Expected %d arguments but got %d instead", function.Arrity, t.Arrity)
 	}
 	//env is a parent environment can be immediate env or global
 	return function.call(env, nil, &t)
@@ -1096,7 +1102,7 @@ func (tkn Tokens) list() (Exp, error) {
 				exps = append(exps, exp)
 			} else {
 				//end of list
-				return List{expressions: exps}, nil
+				return List{Expressions: exps}, nil
 			}
 		}
 	}
@@ -1122,7 +1128,7 @@ func (tkn Tokens) asignment() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			ass := Assigment{lv, op, rv}
+			ass := Assignment{lv, op, rv}
 			return ass, nil
 		}
 		//TODO: add print method to exp interface , i could have called it here. cool right. Maybe add this later
@@ -1152,7 +1158,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				expleft = LogicalOr{left: expleft, operator: op, right: expright}
+				expleft = LogicalOr{Left: expleft, Operator: op, Right: expright}
 				continue Matching_Loop
 			}
 		}
@@ -1181,7 +1187,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				expleft = LogicalAnd{left: expleft, operator: op, right: expright}
+				expleft = LogicalAnd{Left: expleft, Operator: op, Right: expright}
 				continue Matching_Loop
 			}
 		}
@@ -1206,7 +1212,7 @@ func (tkn Tokens) equality() (Exp, error) {
 			if err != nil {
 				return nil, err
 			}
-			cexpleft = Binary{left: cexpleft, operator: op, right: cexpright}
+			cexpleft = Binary{Left: cexpleft, Operator: op, Right: cexpright}
 		}
 		break
 	}
@@ -1236,7 +1242,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				texpleft = Binary{left: texpleft, operator: op, right: texpright}
+				texpleft = Binary{Left: texpleft, Operator: op, Right: texpright}
 				continue Matching_Loop
 			}
 		}
@@ -1266,7 +1272,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				fexpleft = Binary{left: fexpleft, operator: op, right: fexpright}
+				fexpleft = Binary{Left: fexpleft, Operator: op, Right: fexpright}
 				continue Matching_Loop
 			}
 		}
@@ -1297,7 +1303,7 @@ Matching_Loop:
 				if err != nil {
 					return nil, err
 				}
-				uexpleft = Binary{left: uexpleft, operator: op, right: fexpright}
+				uexpleft = Binary{Left: uexpleft, Operator: op, Right: fexpright}
 				continue Matching_Loop
 			}
 		}
@@ -1315,7 +1321,7 @@ func (tkn Tokens) unary() (Exp, error) {
 		if err != nil {
 			return nil, err
 		}
-		return Unary{operator: op, right: uexp}, nil
+		return Unary{Operator: op, Right: uexp}, nil
 	}
 	return tkn.call()
 }
@@ -1337,7 +1343,7 @@ Matching_Loop:
 			op := cToken
 			if tkn[current].Ttype == scanner.RIGHT_PAREN {
 				//empty
-				callee = Call{arrity: 0, callee: callee, operator: op, args: nil}
+				callee = Call{Arrity: 0, Callee: callee, Operator: op, Args: nil}
 				current++
 				continue
 			}
@@ -1357,9 +1363,9 @@ Matching_Loop:
 			//TODO:check function arrity here
 			arrity := 1
 			if isListExp {
-				arrity = len(list.expressions)
+				arrity = len(list.Expressions)
 			}
-			callee = Call{arrity: arrity, callee: callee, operator: op, args: args}
+			callee = Call{Arrity: arrity, Callee: callee, Operator: op, Args: args}
 			current++
 			continue Matching_Loop
 		}
