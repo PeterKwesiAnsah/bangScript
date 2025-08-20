@@ -4,6 +4,7 @@ import (
 	"bangScript/gbs/parser"
 	"bangScript/gbs/scanner"
 	"fmt"
+	"strconv"
 )
 
 type VariableMetaData struct {
@@ -26,7 +27,6 @@ const (
 
 var TopOfCallStack uint32 = NONE
 
-// TODO: Glance through the resolver functions
 // move parser.(type).evaluate,parser.(type).execute to resolver.(type).execute and resolver.(type).evaluate
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	caller := TopOfCallStack
@@ -339,7 +339,6 @@ func ResolveStmt(t parser.Stmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 		return ResolveExpStmt(t, env)
 	case parser.PrintStmt:
 		return ResolvePrintStmt(t, env)
-
 	default:
 		return nil, fmt.Errorf("unknown statement type: %T", t)
 	}
@@ -355,4 +354,39 @@ func Resolver(stmts []parser.Stmt, env *parser.Stmtsenv) ([]ResolvedStmt, error)
 		resolvedStmts = append(resolvedStmts, resolvedStmt)
 	}
 	return resolvedStmts, nil
+}
+
+// TODO: Resolved Expressions Implementations
+func (t ResolvedPrimary) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	if t.ScopeDepth == 0 {
+		return nil, fmt.Errorf("Variable %s is not defined", t.Node.Lexem)
+	}
+	// variable operand
+	if t.ScopeDepth > 0 {
+		env = env.Get(t.ScopeDepth)
+		return env.Local[t.Node.Lexem], nil
+	}
+	//if scope depth is -1 then it is a constant literal
+	// operands needs to be only following string , number and boolean
+	switch t.Node.Ttype {
+	case scanner.NUMBER:
+		op, err := strconv.ParseFloat(t.Node.Lexem, 64)
+		if err != nil {
+			//handle error for failed type conversion
+			return nil, err
+		}
+		return op, nil
+	//string concantenation and comparison
+	case scanner.STRING:
+		return t.Node.Lexem, nil
+	//boolean algebra
+	case scanner.TRUE:
+		return true, nil
+	case scanner.FALSE:
+		return false, nil
+	case scanner.NIL:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("Expected a string, number, a target location , nil and boolean but got %d at line %d", t.Node.Ttype, t.Node.Line)
+	}
 }
