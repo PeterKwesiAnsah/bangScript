@@ -26,29 +26,37 @@ const (
 
 var TopOfCallStack uint32 = NONE
 
+// TODO: Glance through the resolver functions
+// move parser.(type).evaluate,parser.(type).execute to resolver.(type).execute and resolver.(type).evaluate
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	caller := TopOfCallStack
 	TopOfCallStack = VAR_STMT
 	switch expT := t.Exp.(type) {
 	case parser.Primary:
+		if expT.Node.Ttype != scanner.IDENTIFIER {
+			return nil, fmt.Errorf("Expected an identifier but got something else %d", expT.Node.Ttype)
+		}
 		lexeme := expT.Node.Lexem
 		_, itExists := env.Local[lexeme]
 		if itExists {
 			return nil, fmt.Errorf("Cannot redeclare a variable in the same scope.")
 		}
 		//is initializer present??
-		env.Local[lexeme] = VariableMetaData{isUsed: false, isResolved: false}
+		env.Local[lexeme] = VariableMetaData{isUsed: false, isResolved: true}
 		TopOfCallStack = caller
 		return ResolvedVarStmt{Exp: ResolvedPrimary{Node: expT.Node, ScopeDepth: -1}}, nil
 	case parser.Assignment:
 		lv := expT.StoreTarget.(parser.Primary)
+		if lv.Node.Ttype != scanner.IDENTIFIER {
+			return nil, fmt.Errorf("Expected an identifier but got something else %d", lv.Node.Ttype)
+		}
 		resolvedExpr, err := ResolveExpr(expT.Right, env)
 		if err != nil {
 			return nil, err
 		}
 		env.Local[lv.Node.Lexem] = VariableMetaData{isUsed: false, isResolved: true}
 		TopOfCallStack = caller
-		return ResolvedVarStmt{Exp: resolvedExpr}, nil
+		return ResolvedVarStmt{Exp: ResolvedAssignment{StoreTarget: ResolvedPrimary{Node: lv.Node, ScopeDepth: -1}, Right: resolvedExpr}}, nil
 	case parser.List:
 		resolvedExpr, err := ResolveList(expT, env)
 		if err != nil {
@@ -81,6 +89,7 @@ func ResolveFuncDef(t parser.FuncDef, env *parser.Stmtsenv) (ResolvedStmt, error
 		if param.Ttype != scanner.IDENTIFIER {
 			return nil, fmt.Errorf("Function parameters need to be identifiers")
 		}
+		//references to the function params
 		t.Body.Env.Local[param.Lexem] = VariableMetaData{isUsed: false, isResolved: true}
 	}
 	resolvedStmt, err := ResolveBlockStmt(t.Body, nil)
@@ -89,11 +98,16 @@ func ResolveFuncDef(t parser.FuncDef, env *parser.Stmtsenv) (ResolvedStmt, error
 	}
 	resolvedBs := resolvedStmt.(ResolvedBlockStmt)
 	TopOfCallStack = caller
+	t.Body.Env.Encloser.Local[t.Name.Lexem] = VariableMetaData{isUsed: false, isResolved: true}
 	return ResolvedFuncDef{Name: t.Name, Params: t.Params, Body: resolvedBs, Arrity: t.Arrity}, nil
 }
 
 func ResolveReturnStmt(t parser.ReturnStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	return nil, nil
+	resolvedExpr, err := ResolveExpr(t.Exp, env)
+	if err != nil {
+		return nil, err
+	}
+	return ResolvedReturnStmt{Exp: resolvedExpr}, nil
 }
 
 func ResolveIfStmt(t parser.IfStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
@@ -154,12 +168,10 @@ func ResolveExpStmt(t parser.ExpStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 }
 
 func ResolvePrintStmt(t parser.PrintStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
-	caller := TopOfCallStack
 	resolvedExpr, err := ResolveExpr(t.Exp, env)
 	if err != nil {
 		return nil, err
 	}
-	TopOfCallStack = caller
 	return ResolvedPrintStmt{Exp: resolvedExpr}, nil
 }
 
@@ -170,11 +182,11 @@ func ResolveAssignment(t parser.Assignment, env *parser.Stmtsenv) (ResolvedExpr,
 	if err != nil {
 		return nil, err
 	}
-	TopOfCallStack = caller
 	resolveValue, err := ResolveExpr(t.Right, env)
 	if err != nil {
 		return nil, err
 	}
+	TopOfCallStack = caller
 	return ResolvedAssignment{StoreTarget: resolveStorageTarget, Right: resolveValue, Operator: t.Operator}, nil
 }
 
@@ -192,11 +204,11 @@ func ResolveList(t parser.List, env *parser.Stmtsenv) (ResolvedExpr, error) {
 			resolvedExps = append(resolvedExps, resolvedVarStmt.Exp)
 			continue
 		}
-		resolvedItem, err := ResolveExpr(expr, env)
+		resolvedExpr, err := ResolveExpr(expr, env)
 		if err != nil {
 			return nil, err
 		}
-		resolvedExps = append(resolvedExps, resolvedItem)
+		resolvedExps = append(resolvedExps, resolvedExpr)
 	}
 	TopOfCallStack = caller
 	return ResolvedList{Expressions: resolvedExps}, nil
@@ -269,13 +281,14 @@ func ResolvePrimary(t parser.Primary, env *parser.Stmtsenv) (ResolvedExpr, error
 			if itExist {
 				//for a variable to be used in a scope , it needs to appear at the left hand side of an assignment/either sides of a binary expression/one side of a unary expression
 				// // basically if it appears to be storage target/destination is not being used other than that is being used.
-				//update variable metadata isUsed		if TopOfCallStack != DESTINATION_ASSIGNMENT {
-				cur.Local[t.Node.Lexem] = VariableMetaData{isUsed: true, isResolved: false}
+				if TopOfCallStack != DESTINATION_ASSIGNMENT {
+					cur.Local[t.Node.Lexem] = VariableMetaData{isUsed: true, isResolved: false}
+				}
+				return ResolvedPrimary{Node: t.Node, ScopeDepth: scopeDepth}, nil
 			}
-			break
+			cur = cur.Encloser
+			scopeDepth++
 		}
-		cur = cur.Encloser
-		scopeDepth++
 	} else {
 		//scope Depth does not apply to literals/variables declared
 		scopeDepth = -1
