@@ -357,6 +357,138 @@ func Resolver(stmts []parser.Stmt, env *parser.Stmtsenv) ([]ResolvedStmt, error)
 }
 
 // TODO: Resolved Expressions Implementations
+func (t ResolvedLogicalAnd) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	objL, err := t.Left.Evaluate(env)
+
+	if err != nil {
+		return nil, err
+	}
+	isTrueL := isTruthy(objL)
+	//short circuit
+	if !isTrueL {
+		return objL, nil
+	}
+	objR, err := t.Right.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	isTrueR := isTruthy(objR)
+	if isTrueR {
+		return objR, nil
+	}
+	return objL, nil
+}
+func (t ResolvedLogicalOr) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	objL, err := t.Left.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	isTrueL := isTruthy(objL)
+
+	//short circuit
+	if isTrueL {
+		return objL, nil
+	}
+	objR, err := t.Right.Evaluate(env)
+
+	if err != nil {
+		return nil, err
+	}
+	return objR, nil
+}
+func (a ResolvedAssignment) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	cur := env
+	lv := a.StoreTarget.(ResolvedPrimary)
+	for cur != nil {
+		_, itExist := cur.Local[lv.Node.Lexem]
+		if itExist {
+			rv, err := a.Right.Evaluate(env)
+			if err != nil {
+				return nil, err
+			}
+			cur.Local[lv.Node.Lexem] = rv
+			return rv, nil
+		}
+		cur = cur.Encloser
+	}
+	return nil, fmt.Errorf("Undefined variable at line %d", a.Operator.Line)
+}
+func (l ResolvedList) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	var rvalue parser.Obj
+	for index, exp := range l.Expressions {
+		value, err := exp.Evaluate(env)
+		if err != nil {
+			return nil, err
+		}
+		if (index + 1) == len(l.Expressions) {
+			rvalue = value
+		}
+	}
+	return rvalue, nil
+}
+
+func (t ResolvedFuncDef) call(env *parser.Stmtsenv, callInfo *ResolvedCall) (value parser.Obj, err error) {
+	bs := t.Body
+
+	defer func() {
+		if r := recover(); r != nil {
+			switch s := r.(type) {
+			case parser.BangScriptReturn:
+				value = s.Value
+			default:
+				panic(r)
+			}
+		}
+	}()
+
+	//bs.Env need to be a complete copy, since it's new, any environment that once enclosed around bs.Env will be updated to support closures
+	newEnv := parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: bs.Env.Encloser, Policy: parser.DYNAMIC}
+	bs.Env = &newEnv
+
+	envWithFunctionArgsOnly := newEnv.Local
+	if callInfo.Args != nil {
+		listArgs, isArgs := callInfo.Args.(ResolvedList)
+		if isArgs {
+			for argI, exp := range listArgs.Expressions {
+				value, err := exp.Evaluate(env)
+				if err != nil {
+					return nil, err
+				}
+				envWithFunctionArgsOnly[t.Params[argI].Lexem] = value
+			}
+		} else {
+			value, err := callInfo.Args.Evaluate(env)
+			if err != nil {
+				return nil, err
+			}
+			envWithFunctionArgsOnly[t.Params[0].Lexem] = value
+		}
+	}
+
+	//the reason why we pass nil is that , we have already created the environments during parsing and each block has it
+	// what we make fresh copies of environment during function calls, and update subsequent environments in the function as they too are dynamic
+	//dynamic env
+	err = bs.Execute(nil)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+func (t ResolvedCall) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	value, err := t.Callee.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	function, isCallable := value.(ResolvedFuncDef)
+	if !isCallable {
+		return nil, fmt.Errorf("Can't call expression at line %d", t.Operator.Line)
+	}
+	if t.Arrity != function.Arrity {
+		return nil, fmt.Errorf("Expected %d arguments but got %d instead", function.Arrity, t.Arrity)
+	}
+	//env is a parent environment can be immediate env or global
+	return function.call(env, &t)
+}
 func (t ResolvedPrimary) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
 	if t.ScopeDepth == 0 {
 		return nil, fmt.Errorf("Variable %s is not defined", t.Node.Lexem)
