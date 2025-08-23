@@ -357,6 +357,202 @@ func Resolver(stmts []parser.Stmt, env *parser.Stmtsenv) ([]ResolvedStmt, error)
 }
 
 // TODO: Resolved Expressions Implementations
+func (u ResolvedUnary) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	Exp, err := u.Right.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	operator := u.Operator.Ttype
+
+	if operator == scanner.BANG {
+		bol, isbol := Exp.(bool)
+		if isbol {
+			return !bol, nil
+		}
+		return nil, fmt.Errorf("Expected a boolean value but got something else at line %d", u.Operator.Line)
+	} else if operator == scanner.MINUS {
+		num, isnum := Exp.(float64)
+		if isnum {
+			return -num, nil
+		}
+		return nil, fmt.Errorf("Expected a number value but got something else at line %d", u.Operator.Line)
+	}
+	return nil, fmt.Errorf("Invalid expression")
+}
+func (b ResolvedBinary) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
+	left, err := b.Left.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	right, err := b.Right.Evaluate(env)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: need to handle nil expressions nil + string or string + nil or nil + 1
+	switch b.Operator.Ttype {
+	case scanner.PLUS:
+		{
+			//string concatenation
+			// TODO: (parse and concatenate) string + number | number + string
+			strLeft, okLeft := left.(string)
+			if okLeft {
+				strRight, okRight := right.(string)
+				if !okRight {
+					return nil, fmt.Errorf("Invalid Right operand, expected a string at line %d", b.Operator.Line)
+				}
+				return strLeft + strRight, nil
+			}
+			// integer addition
+			floatLeft, okLeft := left.(float64)
+			if okLeft {
+				floatRight, okRight := right.(float64)
+				if !okRight {
+					return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.Operator.Line)
+				}
+				return floatLeft + floatRight, nil
+			}
+		}
+	case scanner.SLASH:
+		{
+			//integer division
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft / nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.MINUS:
+		{
+			//integer division
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft - nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.STAR:
+		{
+			//integer division
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft * nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.GREATER:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft > nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.GREATER_EQUAL:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft >= nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.LESS:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft < nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.LESS_EQUAL:
+		{
+			//integer comparison
+			nLeft, okLeft := left.(float64)
+			nRight, okRight := right.(float64)
+			if okLeft && okRight {
+				return (nLeft <= nRight), nil
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.EQUAL_EQUAL:
+		{
+			switch left.(type) {
+			case string:
+				{
+					//string comparison
+					str, isStr := right.(string)
+					if isStr {
+						return left == str, nil
+					}
+				}
+			case float64:
+				{
+					//integer equality check
+					num, isNum := right.(float64)
+					if isNum {
+						return left == num, nil
+					}
+				}
+			case bool:
+				{
+					//boolean arithemetic
+					bool, isBool := right.(bool)
+					if isBool {
+						return left == bool, nil
+					}
+				}
+			default:
+				// no match;
+				return nil, fmt.Errorf("Invalid expression.")
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	case scanner.BANG_EQUAL:
+		{
+			switch left.(type) {
+			case string:
+				{
+					strRight, isStr := right.(string)
+					if isStr {
+						return left != strRight, nil
+					}
+				}
+			case float64:
+				{
+					numRight, isNum := right.(float64)
+					if isNum {
+						return left != numRight, nil
+					}
+				}
+			case bool:
+				{
+					boolRight, isBool := right.(bool)
+					if isBool {
+						return left != boolRight, nil
+					}
+				}
+			default:
+				// no match;
+				return nil, fmt.Errorf("Invalid expression.")
+			}
+			return nil, fmt.Errorf("Invalid expression.")
+		}
+	default:
+		{
+			return nil, fmt.Errorf("Invalid operator at line %d.", b.Operator.Line)
+		}
+
+	}
+	return nil, fmt.Errorf("Invalid expression.")
+}
 func (t ResolvedLogicalAnd) Evaluate(env *parser.Stmtsenv) (parser.Obj, error) {
 	objL, err := t.Left.Evaluate(env)
 
