@@ -1,7 +1,7 @@
 #### BangScript
 A JavaScript-like (not-JavaScript) scripting language built from scratch for fun and learning purposes. It’s written in Go, with plans to port the interpreter to C for performance, reduced runtime overhead and lower-level control.
 
-##### Features
+#### Features
 - Dynamic Type System
 - Functions/Closures
 - Automatic Memory Management
@@ -45,7 +45,7 @@ counter(); // → 2
 counter(); // → 3
 ```
 
-##### What's Next
+#### What's Next
 - [x] Lexer/Scanner
 - [x] Parser
 - [x] Interactive REPL
@@ -54,5 +54,5 @@ counter(); // → 3
 - [] Inheritance
 - [] Bytecode VM
 
-##### Credits
-This Language is heavily inspired by []
+#### Credits
+This Language is heavily inspired by [lox](https://craftinginterpreters.com/)
