@@ -374,6 +374,7 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	return tkn.expStmt()
 }
 func Parser(tkn Tokens, globalEnv *Stmtsenv, m uint8) ([]Stmt, error) {
+	current = 0
 	stmts := []Stmt{}
 	Mode = m
 	for tkn[current].Ttype != scanner.EOF {

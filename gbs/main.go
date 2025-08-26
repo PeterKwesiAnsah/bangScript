@@ -20,12 +20,15 @@ const (
 
 type source []byte
 
+var globalEnv = parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
+
 func (t source) RunCode(mode uint8) error {
+	fmt.Println("Running code...")
 	tokens, err := scanner.ScanTokens(t)
 	if err != nil {
+		fmt.Println("Running code...error")
 		return err
 	}
-	globalEnv := parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
 	stmts, err := parser.Parser(tokens, &globalEnv, mode)
 	if err != nil {
 		return err
