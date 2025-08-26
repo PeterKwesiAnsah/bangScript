@@ -5,6 +5,7 @@ package main
 
 import (
 	"bangScript/gbs/parser"
+	"bangScript/gbs/resolver"
 	"bangScript/gbs/scanner"
 	"bufio"
 	"fmt"
@@ -29,19 +30,24 @@ func (t source) RunCode(mode uint8) error {
 	if err != nil {
 		return err
 	}
-	for _, stmt := range stmts {
-		if stmt == nil {
+	resolvedStmts, err := resolver.Resolver(stmts, &globalEnv)
+
+	if err != nil {
+		return err
+	}
+	for _, rstmt := range resolvedStmts {
+		if rstmt == nil {
 			continue
 		}
 		var executionError error
 		//TODO: complete Stmts with Env
-		switch stmt.(type) {
-		case parser.WhileStmt:
-			executionError = stmt.Execute(nil)
-		case parser.BlockStmt:
-			executionError = stmt.Execute(nil)
+		switch rstmt.(type) {
+		case resolver.ResolvedWhileStmt:
+			executionError = rstmt.Execute(nil)
+		case resolver.ResolvedBlockStmt:
+			executionError = rstmt.Execute(nil)
 		default:
-			executionError = stmt.Execute(&globalEnv)
+			executionError = rstmt.Execute(&globalEnv)
 		}
 		if executionError != nil {
 			return executionError
@@ -89,6 +95,7 @@ func main() {
 			}
 			if err := scannerIO.Err(); err != nil {
 				fmt.Printf("Error reading input: %v\n", err)
+				os.Exit(1)
 			}
 		}
 	}

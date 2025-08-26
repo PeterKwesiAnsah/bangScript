@@ -6,10 +6,10 @@ import (
 )
 
 type ResolvedStmt interface {
-	execute() error
+	Execute(env *parser.Stmtsenv) error
 }
 type ResolvedExpr interface {
-	evaluate() error
+	Evaluate(env *parser.Stmtsenv) (parser.Obj, error)
 }
 
 type ResolvedCall struct {
@@ -111,53 +111,4 @@ type ResolvedFuncDef struct {
 type ResolvedReturnStmt struct {
 	//currently we allow returns to exps for now. In the future we change to statment because of closures
 	Exp ResolvedExpr
-}
-
-func (t ResolvedFuncDef) execute() error {
-	return nil
-}
-func (t ResolvedVarStmt) execute() error {
-	return nil
-}
-func (t ResolvedPrintStmt) execute() error {
-	return nil
-}
-func (t ResolvedExpStmt) execute() error {
-	return nil
-}
-func (t ResolvedForStmt) execute() error {
-	return nil
-}
-func (t ResolvedWhileStmt) execute() error {
-	return nil
-}
-func (t ResolvedBlockStmt) execute() error {
-	return nil
-}
-func (t ResolvedIfStmt) execute() error {
-	return nil
-}
-func (t ResolvedList) evaluate() error {
-	return nil
-}
-func (t ResolvedAssignment) evaluate() error {
-	return nil
-}
-func (t ResolvedLogicalOr) evaluate() error {
-	return nil
-}
-func (t ResolvedLogicalAnd) evaluate() error {
-	return nil
-}
-func (t ResolvedUnary) evaluate() error {
-	return nil
-}
-func (t ResolvedPrimary) evaluate() error {
-	return nil
-}
-func (t ResolvedCall) evaluate() error {
-	return nil
-}
-func (t ResolvedBinary) evaluate() error {
-	return nil
 }

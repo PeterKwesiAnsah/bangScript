@@ -40,7 +40,6 @@ const (
 )
 
 var TopOfCallStack uint32 = NONE
-var mode uint8 = REPL
 
 // TODO: go through resolver.(type).Execute
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
@@ -368,79 +367,6 @@ func Resolver(stmts []parser.Stmt, env *parser.Stmtsenv) ([]ResolvedStmt, error)
 	return resolvedStmts, nil
 }
 
-// TODO: Resolved Statements Implementations
-// evaluate to "<fn funcname >"
-// func (t FuncDef) Evaluate(env *Stmtsenv) (Obj, error)
-// bind function name to it's value in env.
-func (t *ResolvedForStmt) StaticToDynamic(parent *parser.Stmtsenv) error {
-	//t.stmt.Env is environment for condition,initializer and single body statement
-	if t.Stmt.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		//condition,initializer and single body statement
-		newEnv := &parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: parent, Policy: DYNAMIC}
-		if t.Stmt.Env == t.Stmt.Body.Env {
-			t.Stmt.Env = newEnv
-			t.Stmt.Body.Env = newEnv
-		} else {
-			t.Stmt.Env = newEnv
-			t.Stmt.Body.StaticToDynamic(newEnv)
-		}
-	} else {
-		if t.Stmt.Env.Encloser != parent {
-			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
-func (t *ResolvedFuncDef) StaticToDynamic(parent *parser.Stmtsenv) error {
-	if t.Body.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		t.Body.Env = &parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: parent, Policy: DYNAMIC}
-	} else {
-		if t.Body.Env.Encloser != parent {
-			return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
-func (t *ResolvedBlockStmt) StaticToDynamic(parent *parser.Stmtsenv) error {
-	if t.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		t.Env = &parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: parent, Policy: DYNAMIC}
-	} else {
-		if t.Env.Encloser != parent {
-			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
-func (t *ResolvedWhileStmt) StaticToDynamic(parent *parser.Stmtsenv) error {
-	if t.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		//condition,initializer and single body statement
-		newEnv := &parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: parent, Policy: DYNAMIC}
-		if t.Env == t.Body.Env {
-			t.Env = newEnv
-			t.Body.Env = newEnv
-		} else {
-			t.Env = newEnv
-			t.Body.StaticToDynamic(newEnv)
-		}
-	} else {
-		if t.Env.Encloser != parent {
-			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
 func (t ResolvedReturnStmt) Execute(env *parser.Stmtsenv) error {
 	value, err := t.Exp.Evaluate(env)
 	if err != nil {
@@ -576,8 +502,6 @@ func (t ResolvedIfStmt) Execute(env *parser.Stmtsenv) error {
 	return nil
 }
 func (t ResolvedBlockStmt) Execute(env *parser.Stmtsenv) error {
-
-	//isDynamic := env != nil
 	for _, stmt := range t.Stmts {
 		if stmt == nil {
 			continue
@@ -659,7 +583,7 @@ func (t ResolvedExpStmt) Execute(env *parser.Stmtsenv) error {
 	if err != nil {
 		return err
 	}
-	if mode == REPL && env.Encloser == nil {
+	if parser.Mode == REPL && env.Encloser == nil {
 		fmt.Printf("%v\n", obj)
 		return nil
 	}

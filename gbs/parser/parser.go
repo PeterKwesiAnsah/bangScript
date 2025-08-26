@@ -3,12 +3,7 @@ package parser
 import (
 	"bangScript/gbs/scanner"
 	"fmt"
-	"strconv"
 )
-
-type bsReturn struct {
-	value Obj
-}
 
 const (
 	REPL uint8 = iota
@@ -28,12 +23,13 @@ type Tokens []*scanner.Token
 type Obj interface{}
 
 type Exp interface {
-	Evaluate(env *Stmtsenv) (Obj, error)
-	//print() string
+	//Evaluate(env *Stmtsenv) (Obj, error)
+	print() string
 }
 
 type Stmt interface {
-	Execute(env *Stmtsenv) error
+	//Execute(env *Stmtsenv) error
+	print() string
 }
 type CallDetails struct {
 	args Exp
@@ -55,7 +51,7 @@ type Stmtsenv struct {
 
 var current int = 0
 var cs CallStack = CallStack{}
-var mode uint8 = REPL
+var Mode uint8 = REPL
 
 func (t *Stmtsenv) Get(depth int) *Stmtsenv {
 	for range depth - 1 {
@@ -63,85 +59,7 @@ func (t *Stmtsenv) Get(depth int) *Stmtsenv {
 	}
 	return t
 }
-func (t *ForStmt) StaticToDynamic(parent *Stmtsenv) error {
-	//t.stmt.Env is environment for condition,initializer and single body statement
-	if t.Stmt.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		//condition,initializer and single body statement
-		newEnv := &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
-		if t.Stmt.Env == t.Stmt.Body.Env {
-			t.Stmt.Env = newEnv
-			t.Stmt.Body.Env = newEnv
-		} else {
-			t.Stmt.Env = newEnv
-			t.Stmt.Body.StaticToDynamic(newEnv)
-		}
-	} else {
-		if t.Stmt.Env.Encloser != parent {
-			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
-func (t *FuncDef) StaticToDynamic(parent *Stmtsenv) error {
-	if t.Body.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		t.Body.Env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
-	} else {
-		if t.Body.Env.Encloser != parent {
-			return fmt.Errorf("ExecutionError: Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
-func (t *BlockStmt) StaticToDynamic(parent *Stmtsenv) error {
-	if t.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		t.Env = &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
-	} else {
-		if t.Env.Encloser != parent {
-			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
-func (t *WhileStmt) StaticToDynamic(parent *Stmtsenv) error {
-	if t.Env == parent {
-		return fmt.Errorf("Child environment can not be the same as Parent")
-	}
-	if parent.Policy == DYNAMIC {
-		//condition,initializer and single body statement
-		newEnv := &Stmtsenv{Local: map[string]Obj{}, Encloser: parent, Policy: DYNAMIC}
-		if t.Env == t.Body.Env {
-			t.Env = newEnv
-			t.Body.Env = newEnv
-		} else {
-			t.Env = newEnv
-			t.Body.StaticToDynamic(newEnv)
-		}
-	} else {
-		if t.Env.Encloser != parent {
-			return fmt.Errorf("Body statement environment should encloses around the env passed to it ")
-		}
-	}
-	return nil
-}
 
-func (t ReturnStmt) Execute(env *Stmtsenv) error {
-	value, err := t.exp.Evaluate(env)
-	if err != nil {
-		return err
-	}
-	panic(bsReturn{
-		value: value,
-	})
-}
 func (tkn Tokens) returnStmt() (Stmt, error) {
 	exp, err := tkn.expression()
 	if err != nil {
@@ -153,10 +71,9 @@ func (tkn Tokens) returnStmt() (Stmt, error) {
 	}
 	current++
 	return ReturnStmt{
-		exp: exp,
+		Exp: exp,
 	}, nil
 }
-
 func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 	name := tkn[current]
 	params := []*scanner.Token{}
@@ -218,71 +135,6 @@ func (tkn Tokens) funcDef(env *Stmtsenv) (Stmt, error) {
 		Body:   stmt,
 		Params: params,
 	}, nil
-}
-
-// evaluate to "<fn funcname >"
-// func (t FuncDef) Evaluate(env *Stmtsenv) (Obj, error)
-// bind function name to it's value in env.
-func (t FuncDef) Execute(env *Stmtsenv) error {
-	bs := t.Body
-	bs.Env.Encloser.Local[t.Name.Lexem] = t
-	return nil
-}
-
-func (t FuncDef) call(env *Stmtsenv, callStack *CallStack, callInfo *Call) (value Obj, err error) {
-	bs := t.Body
-
-	defer func() {
-		if r := recover(); r != nil {
-			switch s := r.(type) {
-			case bsReturn:
-				value = s.value
-			default:
-				panic(r)
-			}
-		}
-	}()
-
-	//bs.Env need to be a complete copy, since it's new, any environment that once enclosed around bs.Env will be updated to support closures
-	newEnv := Stmtsenv{Local: map[string]Obj{}, Encloser: bs.Env.Encloser, Policy: DYNAMIC}
-	bs.Env = &newEnv
-
-	envWithFunctionArgsOnly := newEnv.Local
-	if callInfo.Args != nil {
-		listArgs, isArgs := callInfo.Args.(List)
-		if isArgs {
-			for argI, exp := range listArgs.Expressions {
-				value, err := exp.Evaluate(env)
-				if err != nil {
-					return nil, err
-				}
-				envWithFunctionArgsOnly[t.Params[argI].Lexem] = value
-			}
-		} else {
-			value, err := callInfo.Args.Evaluate(env)
-			if err != nil {
-				return nil, err
-			}
-			envWithFunctionArgsOnly[t.Params[0].Lexem] = value
-		}
-	}
-	cs = append(cs, &CallDetails{
-		args: callInfo.Args,
-		at:   callInfo.Operator.Line,
-		name: t.Name.Lexem,
-	})
-	//the reason why we pass nil is that , we have already created the environments during parsing and each block has it
-	// what we make fresh copies of environment during function calls, and update subsequent environments in the function as they too are dynamic
-	//dynamic env
-	err = bs.Execute(nil)
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
-func (t ForStmt) Execute(parent *Stmtsenv) error {
-	return t.Stmt.Execute(nil)
 }
 
 func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
@@ -356,48 +208,27 @@ func (tkn Tokens) forStmt(env *Stmtsenv) (Stmt, error) {
 				Env: &whileScope}}}, nil
 	}
 }
-
-// TODO: implements loop keyword like continue,break
-func (t WhileStmt) Execute(env *Stmtsenv) error {
-	var executionErr error
-	var evalErr error
-	//env should be nil
-	if env != nil {
-		return fmt.Errorf("Block statements does not need the caller's env")
-	}
-	if t.Init != nil {
-		//init is neither a while stmt or a block stmt
-		executionErr = t.Init.Execute(t.Env)
-		if executionErr != nil {
-			return executionErr
+func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
+	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: Encloser}
+	stmts := []Stmt{}
+	stmt := BlockStmt{}
+	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
+		stmt, err := tkn.declarations(&inner)
+		// TODO:if stmt is continue/break/return or any other loop related statement we throw error because loops will now handle parsing it's body
+		// TODO: handle the above in the resolver
+		if err != nil {
+			return nil, err
 		}
+		stmts = append(stmts, stmt)
 	}
-	goto evaluateAndtest
-executeBody:
-	{
-		//creating new environment per iteration??
-		executionErr = t.Body.Execute(nil)
-		if executionErr != nil {
-			return executionErr
-		}
-		goto evaluateAndtest
+	if tkn[current].Ttype != scanner.RIGHT_BRACE {
+		return nil, fmt.Errorf("ParseError: Expected a right brace but got EOF at line %d", tkn[current].Line)
 	}
-evaluateAndtest:
-	//infinite loop equivalent to while(true)
-	if t.Condition == nil {
-		goto executeBody
-	}
-	obj, evalErr := t.Condition.Evaluate(t.Env)
-	if evalErr != nil {
-		return evalErr
-	}
-	isTruth := isTruthy(obj)
-	if isTruth {
-		goto executeBody
-	}
-	return nil
+	current++
+	stmt.Stmts = stmts
+	stmt.Env = &inner
+	return stmt, nil
 }
-
 func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
 		return nil, fmt.Errorf("Expected left paren after while but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
@@ -423,84 +254,6 @@ func (tkn Tokens) whileStmt(Encloser *Stmtsenv) (Stmt, error) {
 	return WhileStmt{Condition: cond, Body: bs, Env: Encloser}, nil
 }
 
-func (t IfStmt) Execute(env *Stmtsenv) error {
-
-	obj, err := t.Condition.Evaluate(env)
-	if err != nil {
-		return err
-	}
-	isTruth := isTruthy(obj)
-
-	if isTruth {
-		switch s := t.Thenbody.(type) {
-		case WhileStmt:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case BlockStmt:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case FuncDef:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case ForStmt:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		default:
-			err = s.Execute(env)
-		}
-		if err != nil {
-			return err
-		}
-	} else {
-		if t.Elsebody == nil {
-			return nil
-		}
-		switch s := t.Elsebody.(type) {
-		case WhileStmt:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case BlockStmt:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case FuncDef:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(env)
-		case ForStmt:
-			err = s.StaticToDynamic(env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(env)
-		default:
-			err = s.Execute(env)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 	if tkn[current].Ttype != scanner.LEFT_PAREN {
 		return nil, fmt.Errorf("Expected left paren after if but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
@@ -530,82 +283,6 @@ func (tkn Tokens) ifStmt(Encloser *Stmtsenv) (Stmt, error) {
 	}
 	return IfStmt{Condition: condexp, Thenbody: stmtBody, Elsebody: elseStmt}, nil
 }
-
-func (t BlockStmt) Execute(env *Stmtsenv) error {
-
-	//isDynamic := env != nil
-	for _, stmt := range t.Stmts {
-		if stmt == nil {
-			continue
-		}
-		//functions have dynamic environment,created when they are called as such nested environments should be updated to enclose around this new env before they are executed
-		var err error
-		switch s := stmt.(type) {
-		case WhileStmt:
-			err = s.StaticToDynamic(t.Env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case BlockStmt:
-			err = s.StaticToDynamic(t.Env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case FuncDef:
-			err = s.StaticToDynamic(t.Env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		case ForStmt:
-			err = s.StaticToDynamic(t.Env)
-			if err != nil {
-				return err
-			}
-			err = s.Execute(nil)
-		default:
-			err = s.Execute(t.Env)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (tkn Tokens) blockStmt(Encloser *Stmtsenv) (Stmt, error) {
-	inner := Stmtsenv{Local: map[string]Obj{}, Encloser: Encloser}
-	stmts := []Stmt{}
-	stmt := BlockStmt{}
-	for tkn[current].Ttype != scanner.EOF && tkn[current].Ttype != scanner.RIGHT_BRACE {
-		stmt, err := tkn.declarations(&inner)
-		// TODO:if stmt is continue/break/return or any other loop related statement we throw error because loops will now handle parsing it's body
-		// TODO: handle the above in the resolver
-		if err != nil {
-			return nil, err
-		}
-		stmts = append(stmts, stmt)
-	}
-	if tkn[current].Ttype != scanner.RIGHT_BRACE {
-		return nil, fmt.Errorf("ParseError: Expected a right brace but got EOF at line %d", tkn[current].Line)
-	}
-	current++
-	stmt.Stmts = stmts
-	stmt.Env = &inner
-	return stmt, nil
-}
-
-func (t PrintStmt) Execute(env *Stmtsenv) error {
-	Obj, err := t.Exp.Evaluate(env)
-	if err != nil {
-		return err
-	}
-	//TODO:function def don't evaluate to simple scalar values like integer,bool etc it evaluates to a struct which won't print nicely
-	fmt.Printf("%v\n", Obj)
-	return nil
-}
 func (tkn Tokens) printStmt() (Stmt, error) {
 	stmt := PrintStmt{}
 	exp, err := tkn.expression()
@@ -620,38 +297,6 @@ func (tkn Tokens) printStmt() (Stmt, error) {
 	current++
 	return stmt, nil
 }
-
-func (t VarStmt) Execute(env *Stmtsenv) error {
-	//check if variable declaration have a definition
-	if t.Exp != nil {
-		switch s := t.Exp.(type) {
-		case Primary:
-			env.Local[s.Node.Lexem] = nil
-		case Assignment:
-			//for now only primary identifier expressions map to a storage location
-			lv, isStorageTarget := s.StoreTarget.(Primary)
-			if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
-				return fmt.Errorf("Cannot use the l-value as storage target")
-			}
-			obj, err := s.Right.Evaluate(env)
-			if err != nil {
-				return err
-			}
-			env.Local[lv.Node.Lexem] = obj
-		case List:
-			for _, exp := range s.Expressions {
-				err := VarStmt{exp}.Execute(env)
-				if err != nil {
-					return err
-				}
-			}
-		default:
-			return fmt.Errorf("Not Valid expression for variable declaration")
-		}
-	}
-	return nil
-}
-
 func (tkn Tokens) varStmt() (Stmt, error) {
 	stmt := VarStmt{}
 	exp, err := tkn.expression()
@@ -665,18 +310,6 @@ func (tkn Tokens) varStmt() (Stmt, error) {
 	current++
 	return stmt, nil
 }
-
-func (t ExpStmt) Execute(env *Stmtsenv) error {
-	obj, err := t.Exp.Evaluate(env)
-	if err != nil {
-		return err
-	}
-	if mode == REPL && env.Encloser == nil {
-		fmt.Printf("%v\n", obj)
-		return nil
-	}
-	return err
-}
 func (tkn Tokens) expStmt() (Stmt, error) {
 	stmt := ExpStmt{}
 	exp, err := tkn.expression()
@@ -685,7 +318,7 @@ func (tkn Tokens) expStmt() (Stmt, error) {
 	}
 	stmt.Exp = exp
 	//expect a ";" terminator only for script mode
-	if mode == REPL {
+	if Mode == REPL {
 		if tkn[current].Ttype == scanner.SEMICOLON {
 			current++
 		}
@@ -742,7 +375,7 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 }
 func Parser(tkn Tokens, globalEnv *Stmtsenv, m uint8) ([]Stmt, error) {
 	stmts := []Stmt{}
-	mode = m
+	Mode = m
 	for tkn[current].Ttype != scanner.EOF {
 		stmt, err := tkn.declarations(globalEnv)
 		if err != nil {
@@ -751,330 +384,6 @@ func Parser(tkn Tokens, globalEnv *Stmtsenv, m uint8) ([]Stmt, error) {
 		stmts = append(stmts, stmt)
 	}
 	return stmts, nil
-}
-
-// implement the Exp interface
-func (p Primary) Evaluate(env *Stmtsenv) (Obj, error) {
-	//for evaluting expressions at compile-time we can perform mathematical operations,logical operations and string concantenation
-	// operands needs to be only following string , number and boolean
-	switch p.Node.Ttype {
-	case scanner.NUMBER:
-		op, err := strconv.ParseFloat(p.Node.Lexem, 64)
-		if err != nil {
-			//handle error for failed type conversion
-			return nil, err
-		}
-		return op, nil
-	//string concantenation and comparison
-	case scanner.STRING:
-		return p.Node.Lexem, nil
-	//boolean algebra
-	case scanner.TRUE:
-		return true, nil
-	case scanner.FALSE:
-		return false, nil
-	case scanner.NIL:
-		return nil, nil
-	case scanner.IDENTIFIER:
-		{
-			cur := env
-			for cur != nil {
-				Obj, itExist := cur.Local[p.Node.Lexem]
-				if itExist {
-					return Obj, nil
-				}
-				cur = cur.Encloser
-			}
-			return nil, fmt.Errorf("Variable %s is undefined at line %d", p.Node.Lexem, p.Node.Line)
-		}
-	default:
-		return nil, fmt.Errorf("Expected a string, number, a target location , nil and boolean but got %d at line %d", p.Node.Ttype, p.Node.Line)
-	}
-}
-
-func (u Unary) Evaluate(env *Stmtsenv) (Obj, error) {
-	Exp, err := u.Right.Evaluate(env)
-	if err != nil {
-		return nil, err
-	}
-	operator := u.Operator.Ttype
-
-	if operator == scanner.BANG {
-		bol, isbol := Exp.(bool)
-		if isbol {
-			return !bol, nil
-		}
-		return nil, fmt.Errorf("Expected a boolean value but got something else at line %d", u.Operator.Line)
-	} else if operator == scanner.MINUS {
-		num, isnum := Exp.(float64)
-		if isnum {
-			return -num, nil
-		}
-		return nil, fmt.Errorf("Expected a number value but got something else at line %d", u.Operator.Line)
-	}
-	return nil, fmt.Errorf("Invalid expression")
-}
-
-func (b Binary) Evaluate(env *Stmtsenv) (Obj, error) {
-	left, err := b.Left.Evaluate(env)
-	if err != nil {
-		return nil, err
-	}
-	right, err := b.Right.Evaluate(env)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: need to handle nil expressions nil + string or string + nil or nil + 1
-	switch b.Operator.Ttype {
-	case scanner.PLUS:
-		{
-			//string concatenation
-			// TODO: (parse and concatenate) string + number | number + string
-			strLeft, okLeft := left.(string)
-			if okLeft {
-				strRight, okRight := right.(string)
-				if !okRight {
-					return nil, fmt.Errorf("Invalid Right operand, expected a string at line %d", b.Operator.Line)
-				}
-				return strLeft + strRight, nil
-			}
-			// integer addition
-			floatLeft, okLeft := left.(float64)
-			if okLeft {
-				floatRight, okRight := right.(float64)
-				if !okRight {
-					return nil, fmt.Errorf("Invalid Right operand, expected a number at line %d", b.Operator.Line)
-				}
-				return floatLeft + floatRight, nil
-			}
-		}
-	case scanner.SLASH:
-		{
-			//integer division
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft / nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.MINUS:
-		{
-			//integer division
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft - nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.STAR:
-		{
-			//integer division
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft * nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.GREATER:
-		{
-			//integer comparison
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft > nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.GREATER_EQUAL:
-		{
-			//integer comparison
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft >= nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.LESS:
-		{
-			//integer comparison
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft < nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.LESS_EQUAL:
-		{
-			//integer comparison
-			nLeft, okLeft := left.(float64)
-			nRight, okRight := right.(float64)
-			if okLeft && okRight {
-				return (nLeft <= nRight), nil
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.EQUAL_EQUAL:
-		{
-			switch left.(type) {
-			case string:
-				{
-					//string comparison
-					str, isStr := right.(string)
-					if isStr {
-						return left == str, nil
-					}
-				}
-			case float64:
-				{
-					//integer equality check
-					num, isNum := right.(float64)
-					if isNum {
-						return left == num, nil
-					}
-				}
-			case bool:
-				{
-					//boolean arithemetic
-					bool, isBool := right.(bool)
-					if isBool {
-						return left == bool, nil
-					}
-				}
-			default:
-				// no match;
-				return nil, fmt.Errorf("Invalid expression.")
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	case scanner.BANG_EQUAL:
-		{
-			switch left.(type) {
-			case string:
-				{
-					strRight, isStr := right.(string)
-					if isStr {
-						return left != strRight, nil
-					}
-				}
-			case float64:
-				{
-					numRight, isNum := right.(float64)
-					if isNum {
-						return left != numRight, nil
-					}
-				}
-			case bool:
-				{
-					boolRight, isBool := right.(bool)
-					if isBool {
-						return left != boolRight, nil
-					}
-				}
-			default:
-				// no match;
-				return nil, fmt.Errorf("Invalid expression.")
-			}
-			return nil, fmt.Errorf("Invalid expression.")
-		}
-	default:
-		{
-			return nil, fmt.Errorf("Invalid operator at line %d.", b.Operator.Line)
-		}
-
-	}
-	return nil, fmt.Errorf("Invalid expression.")
-}
-func (t LogicalAnd) Evaluate(env *Stmtsenv) (Obj, error) {
-	objL, err := t.Left.Evaluate(env)
-
-	if err != nil {
-		return nil, err
-	}
-	isTrueL := isTruthy(objL)
-	//short circuit
-	if !isTrueL {
-		return objL, nil
-	}
-	objR, err := t.Right.Evaluate(env)
-	if err != nil {
-		return nil, err
-	}
-	isTrueR := isTruthy(objR)
-	if isTrueR {
-		return objR, nil
-	}
-	return objL, nil
-}
-func (t LogicalOr) Evaluate(env *Stmtsenv) (Obj, error) {
-	objL, err := t.Left.Evaluate(env)
-	if err != nil {
-		return nil, err
-	}
-	isTrueL := isTruthy(objL)
-
-	//short circuit
-	if isTrueL {
-		return objL, nil
-	}
-	objR, err := t.Right.Evaluate(env)
-
-	if err != nil {
-		return nil, err
-	}
-	return objR, nil
-}
-func (a Assignment) Evaluate(env *Stmtsenv) (Obj, error) {
-	cur := env
-	lv, isStorageTarget := a.StoreTarget.(Primary)
-	if !(isStorageTarget && lv.Node.Ttype == scanner.IDENTIFIER) {
-		return nil, fmt.Errorf("Cannot use the l-value as storage target")
-	}
-	for cur != nil {
-		_, itExist := cur.Local[lv.Node.Lexem]
-		if itExist {
-			rv, err := a.Right.Evaluate(env)
-			if err != nil {
-				return nil, err
-			}
-			cur.Local[lv.Node.Lexem] = rv
-			return rv, nil
-		}
-		cur = cur.Encloser
-	}
-	return nil, fmt.Errorf("Undefined variable at line %d", a.Operator.Line)
-}
-func (l List) Evaluate(env *Stmtsenv) (Obj, error) {
-	var rvalue Obj
-	for index, exp := range l.Expressions {
-		value, err := exp.Evaluate(env)
-		if err != nil {
-			return nil, err
-		}
-		if (index + 1) == len(l.Expressions) {
-			rvalue = value
-		}
-	}
-	return rvalue, nil
-}
-func (t Call) Evaluate(env *Stmtsenv) (Obj, error) {
-	value, err := t.Callee.Evaluate(env)
-	if err != nil {
-		return nil, err
-	}
-	function, isCallable := value.(FuncDef)
-	if !isCallable {
-		return nil, fmt.Errorf("Can't call expression at line %d", t.Operator.Line)
-	}
-	if t.Arrity != function.Arrity {
-		return nil, fmt.Errorf("Expected %d arguments but got %d instead", function.Arrity, t.Arrity)
-	}
-	//env is a parent environment can be immediate env or global
-	return function.call(env, nil, &t)
 }
 
 // TODO: grammer for tenary expressions
@@ -1409,16 +718,4 @@ func (tkn Tokens) primary() (Exp, error) {
 	tnode.Node = tkn[current]
 	current++
 	return tnode, nil
-}
-
-func isTruthy(val Obj) bool {
-	isTruthy := true
-	var falsyVal []Obj = []Obj{"", nil, 0, false}
-	for _, falsy := range falsyVal {
-		if falsy == val {
-			isTruthy = false
-			break
-		}
-	}
-	return isTruthy
 }
