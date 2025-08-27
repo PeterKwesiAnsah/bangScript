@@ -41,7 +41,7 @@ const (
 
 var TopOfCallStack uint32 = NONE
 
-// TODO: go through resolver.(type).Execute
+// TODO: Handle loop constructs/function specific keywords like return,break,continue
 func ResolveVarStmt(t parser.VarStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	caller := TopOfCallStack
 	TopOfCallStack = VAR_STMT
@@ -114,6 +114,9 @@ func ResolveFuncDef(t parser.FuncDef, env *parser.Stmtsenv) (ResolvedStmt, error
 }
 
 func ResolveReturnStmt(t parser.ReturnStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
+	if TopOfCallStack != FUNC_DEF_STMT {
+		return nil, fmt.Errorf("Return statement can only be used inside a function body")
+	}
 	resolvedExpr, err := ResolveExpr(t.Exp, env)
 	if err != nil {
 		return nil, err
