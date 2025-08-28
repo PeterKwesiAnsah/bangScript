@@ -5,21 +5,20 @@ A JavaScript-like (not-JavaScript) scripting language built from scratch for fun
 - Dynamic Type System
 - Functions/Closures
 - Automatic Memory Management
-- Classes/Objects
 - Block c-style comments
-- Tenary Operators
 - Multi-line string literals
 
 ##### Getting Started
 ###### Requirements
 - Go 1.21+
 - Git
+###### To run the REPL
 ```bash
 git clone https://github.com/peterkwesiansah/bangscript.git
 cd bangScript/gbs
 go run main.go
 ```
-or run a script
+###### or a script
 ```bash
 git clone https://github.com/peterkwesiansah/bangscript.git
 cd bangScript/gbs
@@ -48,11 +47,11 @@ counter(); // → 3
 #### What's Next
 - [x] Lexer/Scanner
 - [x] Parser
+- [x] Resolver
+- [x] Tree-walk Interpreter
 - [x] Interactive REPL
-- [] Finalizing Closures
-- [] Classes
-- [] Inheritance
-- [] Bytecode VM
+- [x] Finalizing Closures
+- [ ] Bytecode VM
 
 #### Credits
 This Language is heavily inspired by [lox](https://craftinginterpreters.com/)
