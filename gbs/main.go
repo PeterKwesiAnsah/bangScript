@@ -23,10 +23,8 @@ type source []byte
 var globalEnv = parser.Stmtsenv{Local: map[string]parser.Obj{}, Encloser: nil}
 
 func (t source) RunCode(mode uint8) error {
-	fmt.Println("Running code...")
 	tokens, err := scanner.ScanTokens(t)
 	if err != nil {
-		fmt.Println("Running code...error")
 		return err
 	}
 	stmts, err := parser.Parser(tokens, &globalEnv, mode)
@@ -43,11 +41,14 @@ func (t source) RunCode(mode uint8) error {
 			continue
 		}
 		var executionError error
-		//TODO: complete Stmts with Env
 		switch rstmt.(type) {
 		case resolver.ResolvedWhileStmt:
 			executionError = rstmt.Execute(nil)
 		case resolver.ResolvedBlockStmt:
+			executionError = rstmt.Execute(nil)
+		case resolver.ResolvedForStmt:
+			executionError = rstmt.Execute(nil)
+		case resolver.ResolvedFuncDef:
 			executionError = rstmt.Execute(nil)
 		default:
 			executionError = rstmt.Execute(&globalEnv)
