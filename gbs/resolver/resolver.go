@@ -353,6 +353,8 @@ func ResolveStmt(t parser.Stmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 		return ResolveExpStmt(t, env)
 	case parser.PrintStmt:
 		return ResolvePrintStmt(t, env)
+	case parser.ReturnStmt:
+		return ResolveReturnStmt(t, env)
 	default:
 		return nil, fmt.Errorf("unknown statement type: %T", t)
 	}
