@@ -93,6 +93,13 @@ type FuncDef struct {
 	Arrity int
 }
 
+type ContinueStmt struct {
+	Token *scanner.Token
+}
+type BreakStmt struct {
+	Token *scanner.Token
+}
+
 type ReturnStmt struct {
 	//currently we allow returns to exps for now. In the future we change to statment because of closures
 	Exp Exp
@@ -125,6 +132,13 @@ func (t WhileStmt) print() string {
 	return ""
 }
 func (t BlockStmt) print() string {
+	return ""
+}
+
+func (t ContinueStmt) print() string {
+	return ""
+}
+func (t BreakStmt) print() string {
 	return ""
 }
 

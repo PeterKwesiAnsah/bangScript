@@ -369,6 +369,20 @@ func (tkn Tokens) declarations(Encloser *Stmtsenv) (Stmt, error) {
 	} else if curT.Ttype == scanner.RETURN {
 		current++
 		return tkn.returnStmt()
+	} else if curT.Ttype == scanner.BREAK {
+		current++
+		if tkn[current].Ttype != scanner.SEMICOLON {
+			return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+		}
+		current++
+		return BreakStmt{Token: curT}, nil
+	} else if curT.Ttype == scanner.CONTINUE {
+		current++
+		if tkn[current].Ttype != scanner.SEMICOLON {
+			return nil, fmt.Errorf("Expected semi-colon but got %d at line %d", tkn[current].Ttype, tkn[current].Line)
+		}
+		current++
+		return ContinueStmt{Token: curT}, nil
 	}
 	//expression statement
 	return tkn.expStmt()

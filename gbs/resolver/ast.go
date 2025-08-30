@@ -112,3 +112,10 @@ type ResolvedReturnStmt struct {
 	//currently we allow returns to exps for now. In the future we change to statment because of closures
 	Exp ResolvedExpr
 }
+
+type ResolvedContinueStmt struct {
+	token *scanner.Token
+}
+type ResolvedBreakStmt struct {
+	token *scanner.Token
+}

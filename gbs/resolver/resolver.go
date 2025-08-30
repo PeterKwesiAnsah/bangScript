@@ -173,6 +173,12 @@ func ResolveForStmt(t parser.ForStmt, env *parser.Stmtsenv) (ResolvedStmt, error
 	return ResolvedForStmt{Stmt: resolvedWs}, nil
 }
 
+func ResolveContinueStmt(t parser.ContinueStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
+	return ResolvedContinueStmt{token: t.Token}, nil
+}
+func ResolveBreakStmt(t parser.BreakStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
+	return ResolvedBreakStmt{token: t.Token}, nil
+}
 func ResolveExpStmt(t parser.ExpStmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 	resolvedExp, err := ResolveExpr(t.Exp, env)
 	if err != nil {
@@ -355,6 +361,10 @@ func ResolveStmt(t parser.Stmt, env *parser.Stmtsenv) (ResolvedStmt, error) {
 		return ResolvePrintStmt(t, env)
 	case parser.ReturnStmt:
 		return ResolveReturnStmt(t, env)
+	case parser.ContinueStmt:
+		return ResolveContinueStmt(t, nil)
+	case parser.BreakStmt:
+		return ResolveBreakStmt(t, nil)
 	default:
 		return nil, fmt.Errorf("unknown statement type: %T", t)
 	}
@@ -386,6 +396,12 @@ func (t ResolvedFuncDef) Execute(env *parser.Stmtsenv) error {
 	bs.Env.Encloser.Local[t.Name.Lexem] = t
 	return nil
 }
+func (t ResolvedContinueStmt) Execute(env *parser.Stmtsenv) error {
+	return nil
+}
+func (t ResolvedBreakStmt) Execute(env *parser.Stmtsenv) error {
+	return nil
+}
 func (t ResolvedForStmt) Execute(parent *parser.Stmtsenv) error {
 	return t.Stmt.Execute(nil)
 }
@@ -407,9 +423,48 @@ func (t ResolvedWhileStmt) Execute(env *parser.Stmtsenv) error {
 executeBody:
 	{
 		//creating new environment per iteration??
-		executionErr = t.Body.Execute(nil)
-		if executionErr != nil {
-			return executionErr
+		//executionErr = t.Body.Execute(nil)
+		for _, stmt := range t.Body.Stmts {
+			if stmt == nil {
+				continue
+			}
+			//functions have dynamic environment,created when they are called as such nested environments should be updated to enclose around this new env before they are executed
+			var err error
+			switch s := stmt.(type) {
+			case ResolvedWhileStmt:
+				err = s.StaticToDynamic(t.Env)
+				if err != nil {
+					return err
+				}
+				err = s.Execute(nil)
+			case ResolvedBlockStmt:
+				err = s.StaticToDynamic(t.Env)
+				if err != nil {
+					return err
+				}
+				err = s.Execute(nil)
+			case ResolvedFuncDef:
+				err = s.StaticToDynamic(t.Env)
+				if err != nil {
+					return err
+				}
+				err = s.Execute(nil)
+			case ResolvedForStmt:
+				err = s.StaticToDynamic(t.Env)
+				if err != nil {
+					return err
+				}
+				err = s.Execute(nil)
+			case ResolvedContinueStmt:
+				goto evaluateAndtest
+			case ResolvedBreakStmt:
+				return nil
+			default:
+				err = s.Execute(t.Env)
+			}
+			if err != nil {
+				return err
+			}
 		}
 		goto evaluateAndtest
 	}

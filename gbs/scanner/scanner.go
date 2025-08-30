@@ -68,6 +68,8 @@ const (
 	TRUE
 	VAR
 	WHILE
+	BREAK
+	CONTINUE
 
 	EOF
 )
@@ -298,22 +300,24 @@ func ScanTokens(source []byte) ([]*Token, error) {
 				tt := IDENTIFIER
 				id := string(source[sp.start:sp.current])
 				keywords := map[string]Tokentype{
-					"and":    AND,
-					"class":  CLASS,
-					"else":   ELSE,
-					"false":  FALSE,
-					"for":    FOR,
-					"fun":    FUN,
-					"if":     IF,
-					"nil":    NIL,
-					"or":     OR,
-					"print":  PRINT,
-					"return": RETURN,
-					"super":  SUPER,
-					"this":   THIS,
-					"true":   TRUE,
-					"var":    VAR,
-					"while":  WHILE,
+					"and":      AND,
+					"class":    CLASS,
+					"else":     ELSE,
+					"false":    FALSE,
+					"for":      FOR,
+					"fun":      FUN,
+					"if":       IF,
+					"nil":      NIL,
+					"or":       OR,
+					"print":    PRINT,
+					"return":   RETURN,
+					"super":    SUPER,
+					"this":     THIS,
+					"true":     TRUE,
+					"var":      VAR,
+					"while":    WHILE,
+					"break":    BREAK,
+					"continue": CONTINUE,
 				}
 				ttV, ok := keywords[id]
 				if ok {
