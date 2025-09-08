@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #define isEOF(c) (c==EOF)
+#define MATCH_CHAR(cur,c) ((cur=fgetc(src)),state.cur++,state.fpos++,!isEOF(cur) && cur==c)
 typedef enum {
     // Single-character tokens
     TOKEN_LEFT_PAREN,
