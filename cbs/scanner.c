@@ -118,6 +118,30 @@ Token scanTokens(FILE *src){
         case '\0':{
             return (Token){state.start,0,state.line,TOKEN_EOF};
         }
+        default:{
+            if (isalpha(c) || c=='_'){
+            }else if (isdigit(c)){
+                char metDot=0;
+                scan_number:
+                    while ((c=fgetc(src),state.cur++,state.fpos++,isdigit(c))){}
+                if(c=='.'){
+                    if(metDot){
+                        scanerr="Malformed number literal\n";
+                        return (Token){state.start,0,state.line,TOKEN_ERROR};
+                    }
+                     metDot=1;
+                    goto scan_number;
+                }
+                //restore File Position to the last valid character + 1
+                fseek(src, state.cur--, SEEK_SET);
+                state.fpos--;
+                size_t length=state.fpos-state.start;
+                return (Token){state.start,length,state.line,TOKEN_NUMBER};
+            }else{
+                scanerr="Unexpected character\n";
+                return (Token){state.start,0,state.line,TOKEN_ERROR};
+            }
+        }
 
     }
     return (Token){state.start,0,state.line,TOKEN_EOF};
