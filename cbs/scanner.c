@@ -1,7 +1,9 @@
 #include "scanner.h"
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct {
     size_t fpos;
@@ -120,6 +122,127 @@ Token scanTokens(FILE *src){
         }
         default:{
             if (isalpha(c) || c=='_'){
+                while ((c=fgetc(src),state.cur++,state.fpos++,isalnum(c) || c=='_')){}
+                //restore File Position to the last valid character + 1
+                fseek(src, state.cur--, SEEK_SET);
+                state.fpos--;
+                size_t length=state.fpos-state.start;
+                char buf[length];
+                fread(buf, length, 1, src);
+
+                switch (buf[0]) {
+                    case 'a': {
+                        if(length == 3 && memcmp((buf+1), "nd", 2) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_AND};
+                        }
+                        break;
+                    }
+                    case 'c': {
+                        if(length == 5 && memcmp((buf+1), "lass", 4) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_CLASS};
+                        }
+                        break;
+                    }
+                    case 'e': {
+                        if(length == 4 && memcmp((buf+1), "lse", 3) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_ELSE};
+                        }
+                        break;
+                    }
+                    case 'f':
+                        if (length > 1) {
+                            switch (buf[1]) {
+                                case 'a': {
+                                    if(length == 5 && memcmp((buf+2), "lse", 3) == 0) {
+                                        return (Token){state.start, length, state.line, TOKEN_FALSE};
+                                    }
+                                    break;
+                                }
+                                case 'o': {
+                                    if(length == 3 && memcmp((buf+2), "r", 1) == 0) {
+                                        return (Token){state.start, length, state.line, TOKEN_FOR};
+                                    }
+                                    break;
+                                }
+                                case 'u': {
+                                    if(length == 3 && memcmp((buf+2), "n", 1) == 0) {
+                                        return (Token){state.start, length, state.line, TOKEN_FUN};
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    case 'i': {
+                        if(length == 2 && memcmp((buf+1), "f", 1) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_IF};
+                        }
+                        break;
+                    }
+                    case 'n': {
+                        if(length == 3 && memcmp((buf+1), "il", 2) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_NIL};
+                        }
+                        break;
+                    }
+                    case 'o': {
+                        if(length == 2 && memcmp((buf+1), "r", 1) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_OR};
+                        }
+                        break;
+                    }
+                    case 'p': {
+                        if(length == 5 && memcmp((buf+1), "rint", 4) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_PRINT};
+                        }
+                        break;
+                    }
+                    case 'r': {
+                        if(length == 6 && memcmp((buf+1), "eturn", 5) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_RETURN};
+                        }
+                        break;
+                    }
+                    case 's': {
+                        if(length == 5 && memcmp((buf+1), "uper", 4) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_SUPER};
+                        }
+                        break;
+                    }
+                    case 't':
+                        if (length > 1) {
+                            switch (buf[1]) {
+                                case 'h': {
+                                    if(length == 4 && memcmp((buf+2), "is", 2) == 0) {
+                                        return (Token){state.start, length, state.line, TOKEN_THIS};
+                                    }
+                                    break;
+                                }
+                                case 'r': {
+                                    if(length == 4 && memcmp((buf+2), "ue", 2) == 0) {
+                                        return (Token){state.start, length, state.line, TOKEN_TRUE};
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    case 'v': {
+                        if(length == 3 && memcmp((buf+1), "ar", 2) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_VAR};
+                        }
+                        break;
+                    }
+                    case 'w': {
+                        if(length == 5 && memcmp((buf+1), "hile", 4) == 0) {
+                            return (Token){state.start, length, state.line, TOKEN_WHILE};
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                return (Token){state.start,length,state.line,TOKEN_IDENTIFIER};
             }else if (isdigit(c)){
                 char metDot=0;
                 scan_number:
@@ -132,17 +255,16 @@ Token scanTokens(FILE *src){
                      metDot=1;
                     goto scan_number;
                 }
+                size_t length=state.fpos-state.start;
                 //restore File Position to the last valid character + 1
                 fseek(src, state.cur--, SEEK_SET);
                 state.fpos--;
-                size_t length=state.fpos-state.start;
                 return (Token){state.start,length,state.line,TOKEN_NUMBER};
             }else{
                 scanerr="Unexpected character\n";
                 return (Token){state.start,0,state.line,TOKEN_ERROR};
             }
         }
-
     }
     return (Token){state.start,0,state.line,TOKEN_EOF};
 }
