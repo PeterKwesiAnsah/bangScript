@@ -56,11 +56,11 @@ typedef enum {
 } TokenType;
 
 typedef struct {
-    size_t fpos;
+    size_t start;
     unsigned int len;
     unsigned int line;
     TokenType tt;
 } Token;
-Token scanTokens(FILE *);
+Token scanTokens(const char *);
 
 #endif
