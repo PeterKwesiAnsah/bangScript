@@ -6,129 +6,119 @@
 #include <string.h>
 
 struct {
-    size_t fpos;
     unsigned int line;
     size_t start;
     signed long cur;
-} state={0,0,0,-1};
+} state={0,0,0};
 
 const char *scanerr="";
 
-Token scanTokens(FILE *src){
-    state.start=state.fpos;
+Token scanTokens(const char *src){
+    state.start=state.cur;
 
     char c=0;
     //skip white spaces
-    while ((c=fgetc(src),state.cur++,state.fpos++,isspace(c))) {
-        if(c=='\n')state.line++;;
+    while ((c=src[state.cur++],isspace(c))) {
+        if(c=='\n')state.line++;
     }
     switch (c) {
         // Single-character tokens
         case '+':{
-            return (Token){state.cur,1,state.line,TOKEN_PLUS};
+            return (Token){state.start,1,state.line,TOKEN_PLUS};
         }
         case '-':{
-            return (Token){state.cur,1,state.line,TOKEN_MINUS};
+            return (Token){state.start,1,state.line,TOKEN_MINUS};
         }
         case '*':{
-            return (Token){state.cur,1,state.line,TOKEN_STAR};
+            return (Token){state.start,1,state.line,TOKEN_STAR};
         }
         case '(':{
-            return (Token){state.cur,1,state.line,TOKEN_LEFT_PAREN};
+            return (Token){state.start,1,state.line,TOKEN_LEFT_PAREN};
         }
         case ')':{
-            return (Token){state.cur,1,state.line,TOKEN_RIGHT_PAREN};
+            return (Token){state.start,1,state.line,TOKEN_RIGHT_PAREN};
         }
         case '{':{
-            return (Token){state.cur,1,state.line,TOKEN_LEFT_BRACE};
+            return (Token){state.start,1,state.line,TOKEN_LEFT_BRACE};
         }
         case '}':{
-            return (Token){state.cur,1,state.line,TOKEN_RIGHT_BRACE};
+            return (Token){state.start,1,state.line,TOKEN_RIGHT_BRACE};
         }
         case ';':{
-            return (Token){state.cur,1,state.line,TOKEN_SEMICOLON};
+            return (Token){state.start,1,state.line,TOKEN_SEMICOLON};
         }
         case ',':{
-            return (Token){state.cur,1,state.line,TOKEN_COMMA};
+            return (Token){state.start,1,state.line,TOKEN_COMMA};
         }
         case '.':{
-            return (Token){state.cur,1,state.line,TOKEN_DOT};
+            return (Token){state.start,1,state.line,TOKEN_DOT};
         }
         //Slash or Comments
         case '/':{
-            if (((c=fgetc(src)),state.cur++,state.fpos++,c=='/')){
-                while ((c=fgetc(src),state.cur++,state.fpos++,c!='\n')){}
-                //restore File Position to '\n'
-                fseek(src, state.cur--, SEEK_SET);
-                state.fpos--;
+            if (src[state.cur]== '/'){
+                //consume till the end of line
+                state.cur++;
+                while ((c=src[state.cur],c!='\n' && !isEOF(c))){
+                    state.cur++;
+                }
                return scanTokens(src);
             }
-            //restore File Position to '\'+1
-            fseek(src, state.cur--, SEEK_SET);
-            state.fpos--;
             return (Token){state.start,1,state.line,TOKEN_SLASH};
         }
         // One or two character tokens
         case '!':{
-              if (((c=fgetc(src)),state.cur++,state.fpos++,c=='=')){
-                  return (Token){state.cur,2,state.line,TOKEN_BANG_EQUAL};
+              if ((c=src[state.cur],c=='=')){
+                  state.cur++;
+                  return (Token){state.start,2,state.line,TOKEN_BANG_EQUAL};
               }
-              //restore File Position to '!'+1
-              fseek(src, state.cur--, SEEK_SET);
-              state.fpos--;
-            return (Token){state.cur,1,state.line,TOKEN_BANG};
+            return (Token){state.start,1,state.line,TOKEN_BANG};
         }
         case '<':{
-            if (((c=fgetc(src)),state.cur++,state.fpos++,c=='=')){
-                return (Token){state.cur,2,state.line,TOKEN_LESS_EQUAL};
+            if ((c=src[state.cur],c=='=')){
+                state.cur++;
+                return (Token){state.start,2,state.line,TOKEN_LESS_EQUAL};
             }
-            //restore File Position to '<'+1
-            fseek(src, state.cur--, SEEK_SET);
-            state.fpos--;
-            return (Token){state.cur,1,state.line,TOKEN_LESS};
+            return (Token){state.start,1,state.line,TOKEN_LESS};
         }
         case '>':{
-            if (((c=fgetc(src)),state.cur++,state.fpos++,c=='=')){
-                return (Token){state.cur,2,state.line,TOKEN_GREATER_EQUAL};
+            if ((c=src[state.cur],c=='=')){
+                state.cur++;
+                return (Token){state.start,2,state.line,TOKEN_GREATER_EQUAL};
             }
-            //restore File Position to '>' + 1
-            fseek(src, state.cur--, SEEK_SET);
-            state.fpos--;
-            return (Token){state.cur,1,state.line,TOKEN_GREATER};
+            return (Token){state.start,1,state.line,TOKEN_GREATER};
         }
         case '=':{
-            if (((c=fgetc(src)),state.cur++,state.fpos++,c=='=')){
-                return (Token){state.cur,2,state.line,TOKEN_EQUAL_EQUAL};
+            if ((c=src[state.cur],c=='=')){
+                state.cur++;
+                return (Token){state.start,2,state.line,TOKEN_EQUAL_EQUAL};
             }
-            //restore File Position to '=' + 1
-            fseek(src, state.cur--, SEEK_SET);
-            state.fpos--;
-            return (Token){state.cur,1,state.line,TOKEN_EQUAL};
+            return (Token){state.start,1,state.line,TOKEN_EQUAL};
         }
         case '"':{
-          while ((c=fgetc(src),state.cur++,state.fpos++,!isEOF(c) && c!='"')){
+          while ((c=src[state.cur],!isEOF(c) && c!='"')){
               if(c=='\n'){
                   state.line++;
               }
+                state.cur++;
           }
            if(isEOF(c)){
                 scanerr="Unterminated String\n";
                 return (Token){state.start+1,0,state.line,TOKEN_ERROR};
            }
-           return (Token){state.start+1,(state.cur-(state.start+1)),state.line,TOKEN_STRING};
+            state.cur++;//consume closing "
+           return (Token){state.start+1,(state.cur-(state.start+2)),state.line,TOKEN_STRING};
         };
         case '\0':{
             return (Token){state.start,0,state.line,TOKEN_EOF};
         }
         default:{
             if (isalpha(c) || c=='_'){
-                while ((c=fgetc(src),state.cur++,state.fpos++,isalnum(c) || c=='_')){}
-                //restore File Position to the last valid character + 1
-                fseek(src, state.cur--, SEEK_SET);
-                state.fpos--;
-                size_t length=state.fpos-state.start;
+                while ((c=src[state.cur],isalnum(c) || c=='_')){
+                    state.cur++;
+                }
+                size_t length=state.cur-state.start;
                 char buf[length];
-                fread(buf, length, 1, src);
+                memcpy(buf,src+state.start,length);
 
                 switch (buf[0]) {
                     case 'a': {
@@ -246,19 +236,20 @@ Token scanTokens(FILE *src){
             }else if (isdigit(c)){
                 char metDot=0;
                 scan_number:
-                    while ((c=fgetc(src),state.cur++,state.fpos++,isdigit(c))){}
+                    while ((c=src[state.cur],isdigit(c))){
+                        state.cur++;
+                    }
                 if(c=='.'){
                     if(metDot){
                         scanerr="Malformed number literal\n";
+                        state.cur++;
                         return (Token){state.start,0,state.line,TOKEN_ERROR};
                     }
                      metDot=1;
+                     state.cur++;
                     goto scan_number;
                 }
-                size_t length=state.fpos-state.start;
-                //restore File Position to the last valid character + 1
-                fseek(src, state.cur--, SEEK_SET);
-                state.fpos--;
+                size_t length=state.cur-state.start;
                 return (Token){state.start,length,state.line,TOKEN_NUMBER};
             }else{
                 scanerr="Unexpected character\n";
