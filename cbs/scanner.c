@@ -11,7 +11,7 @@ struct {
     signed long cur;
 } state={0,0,0};
 
-const char *scanerr="";
+const char *scanerr;
 
 Token scanTokens(const char *src){
     state.start=state.cur;
