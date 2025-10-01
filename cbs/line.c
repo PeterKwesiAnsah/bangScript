@@ -20,9 +20,11 @@ void add(unsigned int line){
         return;
     }
     curlineNum=line;
-    assert(line==lines.len+1);
+    while(line!=lines.len+1){
+        //fill in the holes
+         append(lines, 0, sizeof(uint8_t));
+    }
     cur=&lines.arr[lines.len];
-    //assuming line numbers are strictly counting and sequential
     append(lines, 1, sizeof(uint8_t));
 }
 
@@ -34,5 +36,5 @@ unsigned int get(size_t offset){
     }
     prevTotal=sum;
     prevSumIndex=i;
-    return i;
+    return i+1;
 }
