@@ -3,6 +3,6 @@
 #define LINE_H
 
 #include <stddef.h>
-void add(unsigned);
-unsigned get(size_t);
+void addLine(unsigned);
+unsigned getLine(size_t);
 #endif
