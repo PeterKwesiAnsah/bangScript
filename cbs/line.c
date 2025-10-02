@@ -24,8 +24,9 @@ void addLine(unsigned int line){
         //fill in the holes
          append(lines, 0, sizeof(uint8_t));
     }
-    cur=&lines.arr[lines.len];
+    size_t curIdx=lines.len;
     append(lines, 1, sizeof(uint8_t));
+    cur=&lines.arr[curIdx];
 }
 
 unsigned int getLine(size_t offset){
