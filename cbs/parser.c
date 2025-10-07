@@ -18,26 +18,7 @@ extern const char *src;
 extern const char *scanerr;
 extern DECLARE_ARRAY(u_int8_t, chunk);
 
-typedef enum {
-PREC_NONE,
-PREC_ASSIGNMENT, // =
-PREC_OR, // or
-PREC_AND, // and
-PREC_EQUALITY, // == !=
-PREC_COMPARISON, // < > <= >=
-PREC_TERM, // + -
-PREC_FACTOR, // * /
-PREC_UNARY, // ! -
-PREC_CALL, // . ()
-PREC_PRIMARY
-} Precedence;
 
-typedef void (*ParseFn)();
-typedef struct {
-ParseFn prefix;
-ParseFn infix;
-Precedence precedence;
-} ParseRule;
 
 
 ParseRule rules[] = {
@@ -89,7 +70,48 @@ void advance(){
         parser.hadError=true;
     }
 }
+static void parsePrecedence(Precedence precedence) {
+    advance();
+    ParseFn prefixRule = rules[parser.previous.tt].prefix;
+    if (prefixRule == NULL) {
+        fputs("Invalid Expression",stderr);
+        return;
+    }
+prefixRule();
+
+while (precedence <= rules[parser.previous.tt].precedence) {
+    advance();
+    ParseFn infixRule = rules[parser.previous.tt].infix;
+    infixRule();
+    }
+}
+
 void expression(){
+    parsePrecedence(PREC_ASSIGNMENT);
+}
+void grouping(){
+    expression();
+    if(parser.current.tt!=TOKEN_RIGHT_PAREN){
+        fprintf(stderr,"Expected Right Paren but got %d",parser.current.tt);
+        return;
+    }
+    advance();
+}
+
+void unary (){
+    Token token=parser.previous;
+    parsePrecedence(PREC_UNARY);
+    switch (token.tt) {
+        case TOKEN_MINUS:
+        {
+            WRITE_BYTECODE(chunk, OP_CONSTANT,0 );
+            WRITE_BYTECODE(chunk, 0,0 );
+            WRITE_BYTECODE(chunk, OP_SUB,0);
+        }
+        break;
+        default:
+            return;
+    }
 }
 
 static void number(){
