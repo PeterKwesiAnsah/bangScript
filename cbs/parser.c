@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include "line.h"
 #include "readonly.h"
+
 #define WRITE_BYTECODE(chunk,byte,line) do{ \
 append(chunk, (u_int8_t)byte, sizeof(u_int8_t));\
 addLine(line);\
@@ -97,6 +98,31 @@ void grouping(){
     }
     advance();
 }
+
+static void binary() {
+    TokenType operatorType = parser.previous.tt;
+    unsigned int line=parser.previous.line;
+    parsePrecedence((Precedence)(rules[parser.previous.tt].precedence + 1));
+    switch (operatorType) {
+        case TOKEN_PLUS:
+            WRITE_BYTECODE(chunk, OP_ADD,line);
+            break;
+        case TOKEN_MINUS:
+          WRITE_BYTECODE(chunk, OP_SUB,line);
+            break;
+        case TOKEN_STAR:
+            WRITE_BYTECODE(chunk, OP_MUL,line);
+            break;
+        case TOKEN_SLASH:
+          WRITE_BYTECODE(chunk, OP_DIV,line);
+            break;
+        default:
+            return; // Unreachable.
+    }
+}
+
+
+
 
 void unary (){
     Token token=parser.previous;
