@@ -100,13 +100,14 @@ void grouping(){
 
 void unary (){
     Token token=parser.previous;
-    parsePrecedence(PREC_UNARY);
+
     switch (token.tt) {
         case TOKEN_MINUS:
         {
             WRITE_BYTECODE(chunk, OP_CONSTANT,0 );
             WRITE_BYTECODE(chunk, 0,0 );
-            WRITE_BYTECODE(chunk, OP_SUB,0);
+            parsePrecedence(PREC_UNARY);
+            WRITE_BYTECODE(chunk, OP_SUB,token.line);
         }
         break;
         default:
