@@ -4,6 +4,6 @@
 #include "readonly.h"
 #include "darray.h"
 #define MAX_STACK_SIZE 256
-void push(value);
-value pop();
+void push(Value);
+Value pop();
 #endif

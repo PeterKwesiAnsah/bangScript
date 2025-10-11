@@ -3,12 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-value stack[MAX_STACK_SIZE];
+Value stack[MAX_STACK_SIZE];
 
-value *top=stack;
+Value *top=stack;
 
 
-void push(value item){
+void push(Value item){
     if(top+1==stack+MAX_STACK_SIZE){
         fprintf(stderr, "Maximum stack size exceeded");
         exit(EXIT_FAILURE);
@@ -17,7 +17,7 @@ void push(value item){
    top++;
 }
 
-value pop(){
+Value pop(){
     top--;
     return *top;
 }
