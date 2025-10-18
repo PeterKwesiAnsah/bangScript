@@ -78,7 +78,7 @@ static void parsePrecedence(Precedence precedence) {
         fputs("Invalid Expression",stderr);
         return;
     }
-prefixRule();
+    prefixRule();
 
 while (precedence <= rules[parser.previous.tt].precedence) {
     advance();
@@ -130,8 +130,7 @@ void unary (){
     switch (token.tt) {
         case TOKEN_MINUS:
         {
-            WRITE_BYTECODE(chunk, OP_CONSTANT,0 );
-            WRITE_BYTECODE(chunk, 0,0 );
+            WRITE_BYTECODE(chunk, OP_CONSTANT_ZER0,0 );
             parsePrecedence(PREC_UNARY);
             WRITE_BYTECODE(chunk, OP_SUB,token.line);
         }
@@ -151,6 +150,7 @@ static void number(){
         WRITE_BYTECODE(chunk, constantIndex & 0xFF, numToken.line);
         WRITE_BYTECODE(chunk, (constantIndex >> 8) & 0xFF, numToken.line);
         WRITE_BYTECODE(chunk, (constantIndex >> 16) & 0xFF, numToken.line);
+        return;
     }
     //write opCode
     WRITE_BYTECODE(chunk, OP_CONSTANT, numToken.line);

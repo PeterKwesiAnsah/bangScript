@@ -2,6 +2,7 @@
 #define CHUNK_H
 enum {
     OP_CONSTANT,
+    OP_CONSTANT_ZER0,
     OP_CONSTANT_LONG,
     OP_ADD  ,
     OP_SUB  ,
