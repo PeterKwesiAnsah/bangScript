@@ -2,7 +2,7 @@
 #include "darray.h"
 #include "arena.h"
 
-DECLARE_ARRAY(Value, constants);
+DECLARE_ARRAY(Value, constants)={};
 
 
 

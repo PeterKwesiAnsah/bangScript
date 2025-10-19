@@ -89,6 +89,12 @@ while (precedence <= rules[parser.previous.tt].precedence) {
 
 void expression(){
     parsePrecedence(PREC_ASSIGNMENT);
+    if(parser.current.tt!=TOKEN_SEMICOLON){
+        fprintf(stderr,"Expected a semi-colon but got %d",parser.current.tt);
+        return;
+    }
+    advance();
+    WRITE_BYTECODE(chunk,OP_RETURN, 0);
 }
 void grouping(){
     expression();

@@ -6,6 +6,7 @@
 Parser parser;
 CompilerStatus compile(const char *src){
     addConstant(0);
+    //Include , true , false and nil
     //set the ball rolling
     advance();
     expression();
