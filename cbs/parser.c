@@ -76,11 +76,12 @@ static void parsePrecedence(Precedence precedence) {
     ParseFn prefixRule = rules[parser.previous.tt].prefix;
     if (prefixRule == NULL) {
         fputs("Invalid Expression",stderr);
+        parser.hadError=true;
         return;
     }
     prefixRule();
 
-while (precedence <= rules[parser.previous.tt].precedence) {
+while (precedence <= rules[parser.current.tt].precedence) {
     advance();
     ParseFn infixRule = rules[parser.previous.tt].infix;
     infixRule();
@@ -90,16 +91,19 @@ while (precedence <= rules[parser.previous.tt].precedence) {
 void expression(){
     parsePrecedence(PREC_ASSIGNMENT);
     if(parser.current.tt!=TOKEN_SEMICOLON){
-        fprintf(stderr,"Expected a semi-colon but got %d",parser.current.tt);
+        fprintf(stderr,"Expected a semi-colon but got %d\n",parser.current.tt);
+        parser.hadError=true;
         return;
     }
     advance();
+    WRITE_BYTECODE(chunk,OP_PRINT, 0);
     WRITE_BYTECODE(chunk,OP_RETURN, 0);
 }
 void grouping(){
-    expression();
+    parsePrecedence(PREC_ASSIGNMENT);
     if(parser.current.tt!=TOKEN_RIGHT_PAREN){
-        fprintf(stderr,"Expected Right Paren but got %d",parser.current.tt);
+        fprintf(stderr,"Expected Right Paren but got %d\n",parser.current.tt);
+        parser.hadError=true;
         return;
     }
     advance();
