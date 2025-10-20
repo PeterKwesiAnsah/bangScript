@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "compiler.h"
+#include "vm.h"
 
 const char *src;
 int main(int argc,char *args[]){
@@ -21,6 +22,11 @@ int main(int argc,char *args[]){
         buffer[bytesRead] = '\0';
         src=buffer;
         fclose(fp);
+
+        CompilerStatus status=compile(src);
+        if(status== COMPILER_ERROR) return status;
+
+        return run();
     }else{
         fprintf(stderr,"Usage: %s [path to script]\n",args[0]);
         exit(1);
