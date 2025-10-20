@@ -5,6 +5,7 @@
 #include "readonly.h"
 #include "stack.h"
 #include <stdint.h>
+#include <stdio.h>
 #define READ_BYTE_CODE(currentInsPointer) (*currentInsPointer++)
 #define EVALUATE_BIN_EXP(operator) do {\
     Value b=pop();\
@@ -60,6 +61,11 @@ ProgramStatus run(){
             break;
             case OP_DIV:
             EVALUATE_BIN_EXP(/);
+            break;
+            case OP_PRINT:{
+            Value result= pop();
+            printf("%f\n",result);
+            }
             break;
             case OP_RETURN:
              return SUCCESS;
