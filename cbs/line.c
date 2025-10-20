@@ -15,7 +15,10 @@ DECLARE_ARRAY(uint8_t, lines);
 
 //indexes of arr, ranges from  0 to n-1 , where in reality are line numbers 1 to n
 void addLine(unsigned int line){
-    if(line==curlineNum){
+    if(line==0){
+        return;
+    }
+    else if(line==curlineNum){
         *cur+=1;
         return;
     }
