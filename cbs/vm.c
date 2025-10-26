@@ -10,7 +10,7 @@
 #define EVALUATE_BIN_EXP(operator) do {\
     Value b=pop();\
     Value a=pop();\
-    push((a operator b));\
+    push(C_DOUBLE_TO_BS_NUMBER((BS_NUMBER_TO_C_DOUBLE(a) operator BS_NUMBER_TO_C_DOUBLE(b))));\
     }\
     while(0)
 
@@ -64,7 +64,7 @@ ProgramStatus run(){
             break;
             case OP_PRINT:{
             Value result= pop();
-            printf("%f\n",result);
+            printf("%f\n",result.value.num);
             }
             break;
             case OP_RETURN:

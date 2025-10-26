@@ -15,6 +15,8 @@ addLine(line);\
 }while(0)
 
 
+
+
 extern const char *src;
 extern const char *scanerr;
 extern DECLARE_ARRAY(u_int8_t, chunk);
@@ -43,7 +45,7 @@ ParseRule rules[] = {
     [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_STRING]        = {string,     NULL,   PREC_NONE},
     [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
     [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
@@ -152,7 +154,7 @@ void unary (){
 
 static void number(){
     Token numToken=parser.previous;
-    size_t constantIndex=addConstant(atof(src+numToken.start));
+    size_t constantIndex=addConstant(C_DOUBLE_TO_BS_NUMBER(atof(src+numToken.start)));
     if(constantIndex >= CONSTANT_LIMIT){
         // Write opcode
         WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, numToken.line);
@@ -166,4 +168,7 @@ static void number(){
     WRITE_BYTECODE(chunk, OP_CONSTANT, numToken.line);
     //write operand Index
     WRITE_BYTECODE(chunk, constantIndex, numToken.line);
+}
+static void string(){
+
 }

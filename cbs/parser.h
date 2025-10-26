@@ -36,6 +36,7 @@ void advance();
 
 //production rules for expressions
 static void number();
+static void string();
 static void grouping();
 static void unary();
 static void binary();
