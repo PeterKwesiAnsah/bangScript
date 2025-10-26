@@ -170,5 +170,19 @@ static void number(){
     WRITE_BYTECODE(chunk, constantIndex, numToken.line);
 }
 static void string(){
+    Token strToken=parser.previous;
+    Value BsObjvalue;
+    BsObjvalue.type=TYPE_OBJ;
+    BsObjStringFromSource *objString=(BsObjStringFromSource *)malloc(sizeof(BsObjStringFromSource));
+    objString->obj=(BsObj){.type=OBJ_TYPE_STRING_SOURCE};
+    objString->value=src+strToken.start;
+    objString->len=strToken.len;
+    BsObjvalue.value.obj=(BsObj *) objString;
 
+    size_t stringLiteralIndex=addConstant(BsObjvalue);
+
+    //write opCode
+    WRITE_BYTECODE(chunk, OP_CONSTANT, strToken.line);
+    //write operand Index
+    WRITE_BYTECODE(chunk, stringLiteralIndex, strToken.line);
 }

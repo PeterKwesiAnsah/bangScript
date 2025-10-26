@@ -16,7 +16,8 @@ typedef enum {
 } BsType;
 
 typedef enum {
-    OBJ_TYPE_STRING,
+    OBJ_TYPE_STRING_SOURCE,
+    OBJ_TYPE_STRING_ALLOC
 } BsObjType;
 
 typedef struct {
@@ -33,7 +34,20 @@ struct BsValue {
 
 typedef struct BsValue Value;
 
+typedef struct {
+    BsObj obj;
+    const char *value;
+    unsigned int len;
+} BsObjStringFromSource;
+
+typedef struct {
+    BsObj obj;
+    unsigned int len;
+    char value[];
+} BsObjStringFromAlloc;
+
 #define C_DOUBLE_TO_BS_NUMBER(double) ((Value){.value={.num=double},.type=TYPE_NUMBER})
 #define BS_NUMBER_TO_C_DOUBLE(number) (number.value.num)
+#define CREATE_BS_OBJ(objPointer) ((Value){.value={.obj=(BsObj *)objPointer},.type=TYPE_OBJ})
 size_t addConstant(Value);
 #endif
