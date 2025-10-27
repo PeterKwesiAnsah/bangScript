@@ -6,6 +6,7 @@
 #include "stack.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #define READ_BYTE_CODE(currentInsPointer) (*currentInsPointer++)
 #define EVALUATE_BIN_EXP(operator) do {\
     Value b=pop();\
@@ -50,8 +51,52 @@ ProgramStatus run(){
                 push(value);
             }
             break;
-            case OP_ADD:
-            EVALUATE_BIN_EXP(+);
+            case OP_ADD:{
+                Value b=pop();
+                Value a=pop();
+                if(a.type!=b.type){
+                    fputs("Add requires operands of the same the type",stderr);
+                    return ERROR;
+                }
+                switch (a.type) {
+                    case TYPE_NUMBER:
+                        push(C_DOUBLE_TO_BS_NUMBER((BS_NUMBER_TO_C_DOUBLE(a) + BS_NUMBER_TO_C_DOUBLE(b))));
+                    break;
+                    case TYPE_OBJ:
+                    {
+                         switch ((a.value.obj)->type) {
+                             case OBJ_TYPE_STRING_SOURCE:
+                                {
+                                    BsObjStringFromSource *BsObjStringA=(BsObjStringFromSource *)a.value.obj;
+                                    BsObjStringFromSource *BsObjStringB=(BsObjStringFromSource *)b.value.obj;
+
+                                    size_t ResultStrLen=BsObjStringA->len + BsObjStringB->len;
+
+                                    BsObjStringFromAlloc *BsObjStringResult=(BsObjStringFromAlloc *)malloc(sizeof(BsObjStringFromAlloc)+ResultStrLen+1);
+
+                                    BsObjStringResult->len=ResultStrLen;
+
+                                    BsObjStringResult->obj=(BsObj){.type=OBJ_TYPE_STRING_ALLOC};
+
+                                    memcpy(BsObjStringResult->value,BsObjStringA->value,BsObjStringA->len);
+                                    memcpy(BsObjStringResult->value + BsObjStringA->len,BsObjStringB->value,BsObjStringB->len);
+
+                                    BsObjStringResult->value[ResultStrLen]='\0';
+                                    push(CREATE_BS_OBJ(BsObjStringResult));
+                                }
+                             break;
+                             default:
+                             fputs("Add requires operands to be either a number or a string type",stderr);
+                             return ERROR;
+                         }
+                    }
+                    break;
+                    default:
+                    fputs("Add requires operands to be either a number or a string type",stderr);
+                    return ERROR;
+                }
+
+            }
             break;
             case OP_SUB:
             EVALUATE_BIN_EXP(-);
@@ -62,9 +107,29 @@ ProgramStatus run(){
             case OP_DIV:
             EVALUATE_BIN_EXP(/);
             break;
-            case OP_PRINT:{
+            case OP_PRINT:
+            {
             Value result= pop();
-            printf("%f\n",result.value.num);
+            switch (result.type) {
+                case TYPE_OBJ:{
+                    switch (result.value.obj->type) {
+                        case OBJ_TYPE_STRING_SOURCE:
+                        printf("%.*s\n",((BsObjStringFromSource *)result.value.obj)->len,((BsObjStringFromSource *)result.value.obj)->value);
+                        break;
+                        case OBJ_TYPE_STRING_ALLOC:
+                        printf("%s\n",((BsObjStringFromAlloc *)result.value.obj)->value);
+                        break;
+                        default:
+                        break;
+                    }
+                }
+                break;
+                case TYPE_BOOL:
+                break;
+                case TYPE_NUMBER:
+                 printf("%f\n",BS_NUMBER_TO_C_DOUBLE(result));
+                break;
+            }
             }
             break;
             case OP_RETURN:
