@@ -14,13 +14,17 @@ struct {
 const char *scanerr;
 
 Token scanTokens(const char *src){
-    state.start=state.cur;
+
 
     char c=0;
     //skip white spaces
-    while ((c=src[state.cur++],isspace(c))) {
+    while ((c=src[state.cur],isspace(c))) {
+        state.cur++;
         if(c=='\n')state.line++;
     }
+
+     state.start=state.cur++;
+
     switch (c) {
         // Single-character tokens
         case '+':{
