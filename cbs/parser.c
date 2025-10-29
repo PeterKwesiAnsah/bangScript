@@ -15,7 +15,7 @@ addLine(line);\
 }while(0)
 
 
-
+Parser parser={{},{},false};
 
 extern const char *src;
 extern const char *scanerr;
@@ -39,7 +39,7 @@ ParseRule rules[] = {
     [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
     [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_EQUAL_EQUAL]   = {NULL,     binary,   PREC_NONE},
     [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
     [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
@@ -50,7 +50,8 @@ ParseRule rules[] = {
     [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FALSE]         = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_TRUE]          = {boolean,  NULL,   PREC_NONE},
+    [TOKEN_FALSE]         = {boolean,  NULL,   PREC_NONE},
     [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
@@ -63,7 +64,7 @@ ParseRule rules[] = {
 };
 
 
-Parser parser={{},{},false};
+
 void advance(){
     parser.previous=parser.current;
     for(;;){
@@ -128,6 +129,9 @@ static void binary() {
         case TOKEN_SLASH:
           WRITE_BYTECODE(chunk, OP_DIV,line);
             break;
+        case TOKEN_EQUAL_EQUAL:
+            WRITE_BYTECODE(chunk, OP_EQUAL,line);
+            break;
         default:
             return; // Unreachable.
     }
@@ -181,8 +185,22 @@ static void string(){
 
     size_t stringLiteralIndex=addConstant(BsObjvalue);
 
+    if(stringLiteralIndex >= CONSTANT_LIMIT){
+        // Write opcode
+        WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, strToken.line);
+        // Write operand as 3 bytes
+        WRITE_BYTECODE(chunk, stringLiteralIndex & 0xFF, strToken.line);
+        WRITE_BYTECODE(chunk, (stringLiteralIndex >> 8) & 0xFF, strToken.line);
+        WRITE_BYTECODE(chunk, (stringLiteralIndex >> 16) & 0xFF, strToken.line);
+        return;
+    }
+
     //write opCode
     WRITE_BYTECODE(chunk, OP_CONSTANT, strToken.line);
     //write operand Index
     WRITE_BYTECODE(chunk, stringLiteralIndex, strToken.line);
+}
+
+static void boolean(){
+
 }
