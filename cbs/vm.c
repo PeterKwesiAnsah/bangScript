@@ -1,5 +1,4 @@
 #include "chunk.h"
-#include "compiler.h"
 #include "vm.h"
 #include "darray.h"
 #include "readonly.h"
@@ -64,9 +63,10 @@ ProgramStatus run(){
                     break;
                     case TYPE_OBJ:
                     {
-                         switch ((a.value.obj)->type) {
-                             case OBJ_TYPE_STRING_SOURCE:
-                                {
+                         //switch ((a.value.obj)->type) {
+                             //case OBJ_TYPE_STRING_SOURCE:
+                             //{
+                                   // Operands a,b can be the same string type or different but they can be used interchangly because they have common fields
                                     BsObjStringFromSource *BsObjStringA=(BsObjStringFromSource *)a.value.obj;
                                     BsObjStringFromSource *BsObjStringB=(BsObjStringFromSource *)b.value.obj;
 
@@ -74,6 +74,7 @@ ProgramStatus run(){
 
                                     BsObjStringFromAlloc *BsObjStringResult=(BsObjStringFromAlloc *)malloc(sizeof(BsObjStringFromAlloc)+ResultStrLen+1);
 
+                                    BsObjStringResult->value=(char *)(BsObjStringResult+(size_t)sizeof(BsObjStringFromAlloc));
                                     BsObjStringResult->len=ResultStrLen;
 
                                     BsObjStringResult->obj=(BsObj){.type=OBJ_TYPE_STRING_ALLOC};
@@ -83,12 +84,12 @@ ProgramStatus run(){
 
                                     BsObjStringResult->value[ResultStrLen]='\0';
                                     push(CREATE_BS_OBJ(BsObjStringResult));
-                                }
-                             break;
-                             default:
-                             fputs("Add requires operands to be either a number or a string type",stderr);
-                             return ERROR;
-                         }
+                                    // }
+                             //break;
+                            // default:
+                             //fputs("Add requires operands to be either a number or a string type",stderr);
+                             //return ERROR;
+                             //}
                     }
                     break;
                     default:
@@ -107,6 +108,12 @@ ProgramStatus run(){
             case OP_DIV:
             EVALUATE_BIN_EXP(/);
             break;
+            case OP_EQUAL:
+  
+        {
+            
+        }
+                break;
             case OP_PRINT:
             {
             Value result= pop();
