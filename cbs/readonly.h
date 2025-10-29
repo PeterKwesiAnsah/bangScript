@@ -36,14 +36,15 @@ typedef struct BsValue Value;
 
 typedef struct {
     BsObj obj;
-    const char *value;
     unsigned int len;
+    const char *value;
 } BsObjStringFromSource;
 
 typedef struct {
     BsObj obj;
     unsigned int len;
-    char value[];
+    char *value;
+    char payload[];
 } BsObjStringFromAlloc;
 
 #define C_DOUBLE_TO_BS_NUMBER(double) ((Value){.value={.num=double},.type=TYPE_NUMBER})
