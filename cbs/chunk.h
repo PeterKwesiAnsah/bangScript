@@ -1,6 +1,6 @@
 #ifndef CHUNK_H
 #define CHUNK_H
-enum {
+typedef enum {
     OP_CONSTANT_ZER0,
     OP_CONSTANT,
     OP_CONSTANT_LONG,
@@ -12,5 +12,5 @@ enum {
     //for debugging purposes
     OP_PRINT,
     OP_RETURN
-} opcodes;
+} BS_OP_CODES;
 #endif

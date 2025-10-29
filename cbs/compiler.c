@@ -1,10 +1,10 @@
 #include "compiler.h"
-#include "scanner.h"
 #include "parser.h"
 #include "readonly.h"
 
-Parser parser;
+
 CompilerStatus compile(const char *src){
+    extern Parser parser;
     addConstant(C_DOUBLE_TO_BS_NUMBER(0));
     //Include , true , false and nil
     //set the ball rolling
