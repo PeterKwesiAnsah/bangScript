@@ -9,6 +9,7 @@ typedef enum {
     OP_MUL  ,
     OP_DIV  ,
     OP_NEGATE,
+    OP_EQUAL,
     //for debugging purposes
     OP_PRINT,
     OP_RETURN

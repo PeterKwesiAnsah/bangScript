@@ -109,10 +109,38 @@ ProgramStatus run(){
             EVALUATE_BIN_EXP(/);
             break;
             case OP_EQUAL:
-  
-        {
-            
-        }
+                {
+                    Value b=pop();
+                    Value a=pop();
+                    if(a.type!=b.type){
+                        fputs("Equal comparison requires operands of the same the type",stderr);
+                        return ERROR;
+                    }
+                    switch (a.type) {
+                        case TYPE_NUMBER:
+                        push(C_DOUBLE_TO_BS_NUMBER(BS_NUMBER_TO_C_DOUBLE(a) == BS_NUMBER_TO_C_DOUBLE(b)));
+                        break;
+                        case TYPE_BOOL:
+                        push(C_BOOL_TO_BS_BOOLEAN(BS_BOOLEAN_TO_C_BOOL(a) == BS_BOOLEAN_TO_C_BOOL(b)));
+                        break;
+                        case TYPE_OBJ:{
+
+                            BsObjString * BsObjStringA=(BsObjString *)a.value.obj;
+                            BsObjString * BsObjStringB=(BsObjString *)b.value.obj;
+
+                            if(BsObjStringA->len!=BsObjStringB->len){
+                                push(C_BOOL_TO_BS_BOOLEAN(false));
+                            }else{
+                                push(C_BOOL_TO_BS_BOOLEAN(!memcmp(BsObjStringA->value, BsObjStringB->value, BsObjStringA->len)));
+                            }
+                        }
+                        break;
+                        default:
+                        fputs("Add requires operands to be either a number, bool or a string type",stderr);
+                        return ERROR;
+                    }
+
+                }
                 break;
             case OP_PRINT:
             {
@@ -132,6 +160,7 @@ ProgramStatus run(){
                 }
                 break;
                 case TYPE_BOOL:
+                    printf("%d\n", BS_BOOLEAN_TO_C_BOOL(result));
                 break;
                 case TYPE_NUMBER:
                  printf("%f\n",BS_NUMBER_TO_C_DOUBLE(result));

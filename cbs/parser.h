@@ -40,4 +40,5 @@ static void string();
 static void grouping();
 static void unary();
 static void binary();
+static void boolean();
 #endif

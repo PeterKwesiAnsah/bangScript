@@ -202,5 +202,9 @@ static void string(){
 }
 
 static void boolean(){
-
+    Token boolToken=parser.previous;
+    //write opCode
+    WRITE_BYTECODE(chunk, OP_CONSTANT, boolToken.line);
+    //write operand Index
+    WRITE_BYTECODE(chunk, (boolToken.tt==TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX:CONSTANT_FALSE_BOOL_INDEX),boolToken.line);
 }
