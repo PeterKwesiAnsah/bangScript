@@ -10,6 +10,8 @@ typedef enum {
     OP_DIV  ,
     OP_NEGATE,
     OP_EQUAL,
+    OP_GREATOR,
+    OP_LESS,
     //for debugging purposes
     OP_PRINT,
     OP_RETURN
