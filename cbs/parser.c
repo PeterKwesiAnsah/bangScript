@@ -39,13 +39,13 @@ ParseRule rules[] = {
     [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
     [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQUAL_EQUAL]   = {NULL,     binary,   PREC_NONE},
-    [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_EQUAL_EQUAL]   = {NULL,     binary, PREC_NONE},
+    [TOKEN_GREATER]       = {NULL,     binary, PREC_COMPARISON},
     [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_STRING]        = {string,     NULL,   PREC_NONE},
+    [TOKEN_STRING]        = {string,   NULL, PREC_NONE},
     [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
     [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
@@ -131,6 +131,12 @@ static void binary() {
             break;
         case TOKEN_EQUAL_EQUAL:
             WRITE_BYTECODE(chunk, OP_EQUAL,line);
+            break;
+        case TOKEN_GREATER:
+            WRITE_BYTECODE(chunk, OP_GREATOR,line);
+            break;
+        case TOKEN_LESS:
+            WRITE_BYTECODE(chunk, OP_LESS,line);
             break;
         default:
             return; // Unreachable.
