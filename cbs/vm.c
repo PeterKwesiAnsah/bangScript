@@ -142,6 +142,24 @@ ProgramStatus run(){
 
                 }
                 break;
+            case OP_EQUAL_NOT:
+                    {
+                        Value b=pop();
+                        Value a=pop();
+                        if(a.type!=b.type){
+                            fputs("Add requires operands of the same the type",stderr);
+                            return ERROR;
+                        }
+                        switch (b.type) {
+                            case TYPE_NUMBER:
+                                push(C_BOOL_TO_BS_BOOLEAN(!(BS_NUMBER_TO_C_DOUBLE(a) == BS_NUMBER_TO_C_DOUBLE(b))));
+                            break;
+                            default:
+                                fputs("Comparison operation requires operands to be a number",stderr);
+                                return ERROR;
+                        }
+                    }
+            break;
             case OP_GREATOR:
                 {
                     Value b=pop();
@@ -152,13 +170,30 @@ ProgramStatus run(){
                     }
                     switch (b.type) {
                         case TYPE_NUMBER:
-                            push(C_DOUBLE_TO_BS_NUMBER(BS_NUMBER_TO_C_DOUBLE(a) > BS_NUMBER_TO_C_DOUBLE(b)));
+                            push(C_BOOL_TO_BS_BOOLEAN((BS_NUMBER_TO_C_DOUBLE(a) > BS_NUMBER_TO_C_DOUBLE(b))));
                         break;
                         default:
-                            fputs("Greator operation requires operands to be a number",stderr);
+                            fputs("Comparison operation requires operands to be a number",stderr);
                             return ERROR;
                     }
                 }
+            break;
+            case OP_GREATOR_NOT: {
+                Value b=pop();
+                Value a=pop();
+                if(a.type!=b.type){
+                    fputs("Add requires operands of the same the type",stderr);
+                    return ERROR;
+                }
+                switch (a.type) {
+                    case TYPE_NUMBER:
+                       push(C_BOOL_TO_BS_BOOLEAN(!(BS_NUMBER_TO_C_DOUBLE(a) > BS_NUMBER_TO_C_DOUBLE(b))));
+                    break;
+                    default:
+                    fputs("Comparison operation requires operands to be a number",stderr);
+                    return ERROR;
+                }
+            }
             break;
             case OP_LESS:
                 {
@@ -170,13 +205,15 @@ ProgramStatus run(){
                     }
                     switch (b.type) {
                         case TYPE_NUMBER:
-                            push(C_DOUBLE_TO_BS_NUMBER(BS_NUMBER_TO_C_DOUBLE(a) < BS_NUMBER_TO_C_DOUBLE(b)));
+                            push(C_BOOL_TO_BS_BOOLEAN(BS_NUMBER_TO_C_DOUBLE(a) < BS_NUMBER_TO_C_DOUBLE(b)));
                         break;
                         default:
-                            fputs("Less operation requires operands to be a number",stderr);
+                            fputs("Comparison operation requires operands to be a number",stderr);
                             return ERROR;
                     }
                 }
+            break;
+            case OP_LESS_NOT:
             break;
             case OP_PRINT:
             {
