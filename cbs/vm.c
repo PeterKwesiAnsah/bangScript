@@ -118,7 +118,7 @@ ProgramStatus run(){
                     }
                     switch (a.type) {
                         case TYPE_NUMBER:
-                        push(C_DOUBLE_TO_BS_NUMBER(BS_NUMBER_TO_C_DOUBLE(a) == BS_NUMBER_TO_C_DOUBLE(b)));
+                        push(C_BOOL_TO_BS_BOOLEAN(BS_NUMBER_TO_C_DOUBLE(a) == BS_NUMBER_TO_C_DOUBLE(b)));
                         break;
                         case TYPE_BOOL:
                         push(C_BOOL_TO_BS_BOOLEAN(BS_BOOLEAN_TO_C_BOOL(a) == BS_BOOLEAN_TO_C_BOOL(b)));
