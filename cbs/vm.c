@@ -142,6 +142,42 @@ ProgramStatus run(){
 
                 }
                 break;
+            case OP_GREATOR:
+                {
+                    Value b=pop();
+                    Value a=pop();
+                    if(a.type!=b.type){
+                        fputs("Add requires operands of the same the type",stderr);
+                        return ERROR;
+                    }
+                    switch (b.type) {
+                        case TYPE_NUMBER:
+                            push(C_DOUBLE_TO_BS_NUMBER(BS_NUMBER_TO_C_DOUBLE(a) > BS_NUMBER_TO_C_DOUBLE(b)));
+                        break;
+                        default:
+                            fputs("Greator operation requires operands to be a number",stderr);
+                            return ERROR;
+                    }
+                }
+            break;
+            case OP_LESS:
+                {
+                    Value b=pop();
+                    Value a=pop();
+                    if(a.type!=b.type){
+                        fputs("Add requires operands of the same the type",stderr);
+                        return ERROR;
+                    }
+                    switch (b.type) {
+                        case TYPE_NUMBER:
+                            push(C_DOUBLE_TO_BS_NUMBER(BS_NUMBER_TO_C_DOUBLE(a) < BS_NUMBER_TO_C_DOUBLE(b)));
+                        break;
+                        default:
+                            fputs("Less operation requires operands to be a number",stderr);
+                            return ERROR;
+                    }
+                }
+            break;
             case OP_PRINT:
             {
             Value result= pop();
