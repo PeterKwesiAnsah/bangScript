@@ -19,6 +19,7 @@ typedef enum {
 
 
 typedef enum {
+    TYPE_NIL,
     TYPE_BOOL,
     TYPE_NUMBER,
     TYPE_OBJ
