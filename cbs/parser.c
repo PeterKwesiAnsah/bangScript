@@ -224,3 +224,9 @@ static void boolean(){
     //write operand Index
     WRITE_BYTECODE(chunk, (boolToken.tt==TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX:CONSTANT_FALSE_BOOL_INDEX),boolToken.line);
 }
+static void nil(){
+    Token nilToken=parser.previous;
+    WRITE_BYTECODE(chunk, OP_CONSTANT, nilToken.line);
+    //write operand Index
+    WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX,nilToken.line);
+}

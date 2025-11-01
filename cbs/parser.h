@@ -1,6 +1,7 @@
 //will contain Patt parser implementation
 #ifndef PARSER_H
 #define PARSER_H
+#include "readonly.h"
 #include "scanner.h"
 #include "stdbool.h"
 
@@ -41,4 +42,5 @@ static void grouping();
 static void unary();
 static void binary();
 static void boolean();
+static void nil();
 #endif
