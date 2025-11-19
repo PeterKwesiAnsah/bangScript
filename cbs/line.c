@@ -25,10 +25,10 @@ void addLine(unsigned int line){
     curlineNum=line;
     while(line!=lines.len+1){
         //fill in the holes
-         append(lines, 0, sizeof(uint8_t));
+         append(lines,uint8_t, 0);
     }
     size_t curIdx=lines.len;
-    append(lines, 1, sizeof(uint8_t));
+    append(lines,uint8_t, 1);
     cur=&lines.arr[curIdx];
 }
 

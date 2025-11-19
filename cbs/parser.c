@@ -10,7 +10,7 @@
 #include "readonly.h"
 
 #define WRITE_BYTECODE(chunk,byte,line) do{ \
-append(chunk, (u_int8_t)byte, sizeof(u_int8_t));\
+append(chunk,u_int8_t,byte);\
 addLine(line);\
 }while(0)
 
