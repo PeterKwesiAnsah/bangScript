@@ -4,6 +4,7 @@
 #include "darray.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #define CONSTANT_LIMIT 256
 #define CONSTANT_LONG_LIMIT 16777216
 
@@ -49,12 +50,14 @@ typedef struct {
     BsObj obj;
     unsigned int len;
     const char *value;
+    uint32_t hash;
 } BsObjStringFromSource;
 
 typedef struct {
     BsObj obj;
     unsigned int len;
     char *value;
+    uint32_t hash;
     char payload[];
 } BsObjStringFromAlloc;
 
@@ -62,6 +65,7 @@ typedef struct {
     BsObj obj;
     unsigned int len;
     char *value;
+    uint32_t hash;
 } BsObjString;
 
 
