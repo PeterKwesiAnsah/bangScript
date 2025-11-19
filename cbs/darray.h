@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 
-#define slice(type,name) \
+#define DECLARE_ARRAY_TYPE(type,name) \
 typedef struct {   \
     size_t cap;\
     size_t len;\
@@ -15,18 +15,26 @@ typedef struct {   \
 #define DECLARE_ARRAY(type, name) \
   struct { size_t cap, len; type *arr; } name
 
+
+
 #define DEFAULT_SLICE_CAP 256
-#define append(slice,el,size) do{ \
-    if (slice.len >= slice.cap) \
+#define grow(array,type,size,count) do{ \
        { \
-        size_t allocap=slice.cap == 0 ? DEFAULT_SLICE_CAP: (2 * slice.cap);\
-        void *ptr = realloc(slice.arr,allocap*size); \
+        type *ptr = (type *)realloc(array.arr,count*size); \
         if (ptr!=NULL) { \
-            slice.cap=allocap;  \
-            slice.arr=ptr;    \
-            slice.arr[slice.len++]=el;\
+            array.cap=count;  \
+            array.arr=ptr;    \
         }else{ fputs("Not enough memory",stderr); exit(1); } \
-    } else{ slice.arr[slice.len++]=el; } \
+    } \
+} while(0)
+
+#define append(array,type,el) do{ \
+    if (array.len >= array.cap) \
+       { \
+        size_t count=array.cap == 0 ? DEFAULT_SLICE_CAP: (2 * array.cap);\
+        grow(array,type,sizeof(type),count);\
+        array.arr[array.len++]=(type)el;\
+    } else{ array.arr[array.len++]=(type)el; } \
 } while(0)
 
 #endif
