@@ -7,7 +7,6 @@
 struct KVnode {
 BsObjString *key;
 Value value;
-struct KVnode *next;
 };
 
 typedef struct KVnode Tnode;
