@@ -4,8 +4,11 @@
 
 
 
-Table table={};
+//Table table={};
 
+
+
+//true if it inserts into an empty bucket, false if it updated one
 bool Tset(Table *Tinstance,BsObjString *key, Value value){
     size_t cap=Tinstance->cap;
     u_int32_t index=key->hash % cap;
@@ -23,10 +26,29 @@ bool Tset(Table *Tinstance,BsObjString *key, Value value){
         node->value=value;
         return false;
     }
-     //regular empty node or head node
+    //regular empty node
     node->key=key;
     node->value=value;
     Tinstance->len++;
 
     return isEmpty;
+}
+
+//true if entry was  found, false otherwise
+bool Tget(Table *Tinstance,BsObjString *key, Value *value){
+    size_t cap=Tinstance->cap;
+    u_int32_t index=key->hash % cap;
+    Tnode *node=&Tinstance->arr[index];
+
+    while(node->key!=NULL || node->key!=key){
+        index=(index+1) % cap;
+        node=&Tinstance->arr[index];
+    }
+
+    if(node->key==NULL){
+        return false;
+    }
+
+    *value=node->value;
+    return true;
 }

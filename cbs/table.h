@@ -4,6 +4,8 @@
 #include "readonly.h"
 #include <stdbool.h>
 
+#define LOAD_FACTOR_MAX 0.75
+
 struct KVnode {
 BsObjString *key;
 Value value;
@@ -15,8 +17,12 @@ typedef struct KVnode Tnode;
 //capacity -> Size of Array of Head Tnodes
 DECLARE_ARRAY_TYPE(Tnode,Table);
 
-bool Tset(Table *,BsObjString *, Value);
 inline void Tinit(Table *);
+
+bool Tset(Table *,BsObjString *, Value);
+Table Tgrow(Table *);
+void Tcopy(Table *,Table *);
+
 bool Tget(Table *,BsObjString *, Value *);
 bool Tdelete(Table *,BsObjString *);
 
