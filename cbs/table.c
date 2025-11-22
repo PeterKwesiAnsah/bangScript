@@ -1,12 +1,24 @@
 #include "table.h"
+#include "darray.h"
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 
 
+// returns true if Tcur is closer to LOAD_FACTOR_MAX, false otherwise
+static inline bool Tgrow(Table Tcur,Table *Tnew){
+    if(((double)(Tcur.len+1)/(Tcur.cap))>= LOAD_FACTOR_MAX){
 
-//Table table={};
+        size_t cap=(size_t)(Tcur.len+1)/(LOAD_FACTOR_MIN);
+        Table temp={.len=Tcur.len,.arr=NULL};
 
-
+        grow(temp, Tnode, sizeof(Tnode), cap);
+        temp.cap=cap;
+        *Tnew=temp;
+        return true;
+    }
+    return false;
+}
 
 //true if it inserts into an empty bucket, false if it updated one
 bool Tset(Table *Tinstance,BsObjString *key, Value value){

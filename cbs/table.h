@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #define LOAD_FACTOR_MAX 0.75
+#define LOAD_FACTOR_MIN 0.1
 
 struct KVnode {
 BsObjString *key;
@@ -19,10 +20,11 @@ DECLARE_ARRAY_TYPE(Tnode,Table);
 
 inline void Tinit(Table *);
 
-bool Tset(Table *,BsObjString *, Value);
-Table Tgrow(Table *);
+static bool Tgrow(Table, Table *);
 void Tcopy(Table *,Table *);
 
+
+bool Tset(Table *,BsObjString *, Value);
 bool Tget(Table *,BsObjString *, Value *);
 bool Tdelete(Table *,BsObjString *);
 
