@@ -5,6 +5,67 @@
 #include <stdio.h>
 
 
+
+void Tcopy(Table *Told, Table *Tnew) {
+
+    size_t cap = Told->cap;
+    Tnode *Toldarr = Told->arr;
+    Tnode *Tnewarr = Tnew->arr;
+    size_t i;
+
+    size_t limit = (cap < 3) ? 0 : cap - 2;
+
+    for (i = 0; i < limit; i += 3) {
+
+        if (Toldarr[i].key != NULL) {
+            u_int32_t index = Toldarr[i].key->hash % Tnew->cap;
+            Tnode *node = &Tnewarr[index];
+            while (node->key != NULL) {
+                index = (index + 1) % Tnew->cap;
+                node = &Tnewarr[index];
+            }
+            node->key = Toldarr[i].key;
+            node->value = Toldarr[i].value;
+        }
+
+        if (Toldarr[i+1].key != NULL) {
+            u_int32_t index = Toldarr[i+1].key->hash % Tnew->cap;
+            Tnode *node = &Tnewarr[index];
+            while (node->key != NULL) {
+                index = (index + 1) % Tnew->cap;
+                node = &Tnewarr[index];
+            }
+            node->key = Toldarr[i+1].key;
+            node->value = Toldarr[i+1].value;
+        }
+
+        if (Toldarr[i+2].key != NULL) {
+            u_int32_t index = Toldarr[i+2].key->hash % Tnew->cap;
+            Tnode *node = &Tnewarr[index];
+            while (node->key != NULL) {
+                index = (index + 1) % Tnew->cap;
+                node = &Tnewarr[index];
+            }
+            node->key = Toldarr[i+2].key;
+            node->value = Toldarr[i+2].value;
+        }
+    }
+
+    for (; i < cap; i++) {
+        if (Toldarr[i].key == NULL)
+            continue;
+
+        u_int32_t index = Toldarr[i].key->hash % Tnew->cap;
+        Tnode *node = &Tnewarr[index];
+
+        while (node->key != NULL) {
+            index = (index + 1) % Tnew->cap;
+            node = &Tnewarr[index];
+        }
+        node->key = Toldarr[i].key;
+        node->value = Toldarr[i].value;
+    }
+}
 // returns true if Tcur is closer to LOAD_FACTOR_MAX, false otherwise
 static inline bool Tgrow(Table Tcur,Table *Tnew){
     if(((double)(Tcur.len+1)/(Tcur.cap))>= LOAD_FACTOR_MAX){
@@ -26,11 +87,11 @@ bool Tset(Table *Tinstance,BsObjString *key, Value value){
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
 
-    //TODO: check load factor, else this while loop never ends
     while(node->key!=NULL || node->key!=key){
         index=(index+1) % cap;
         node=&Tinstance->arr[index];
     }
+
 
     bool isEmpty=node->key==NULL;
     if(node->key==key){
