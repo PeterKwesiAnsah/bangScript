@@ -18,7 +18,18 @@ typedef struct {   \
 
 
 #define DEFAULT_SLICE_CAP 256
-#define grow(array,type,size,count) do{ \
+
+#define growDarrPtr(arrptr,type,size,count) do{ \
+       { \
+        type *ptr = (type *)realloc(arrptr->arr,count*size); \
+        if (ptr!=NULL) { \
+            arrptr->cap=count;  \
+            arrptr->arr=ptr;    \
+        }else{ fputs("Not enough memory",stderr); exit(1); } \
+    } \
+} while(0)
+
+#define growDarr(array,type,size,count) do{ \
        { \
         type *ptr = (type *)realloc(array.arr,count*size); \
         if (ptr!=NULL) { \
@@ -32,7 +43,7 @@ typedef struct {   \
     if (array.len >= array.cap) \
        { \
         size_t count=array.cap == 0 ? DEFAULT_SLICE_CAP: (2 * array.cap);\
-        grow(array,type,sizeof(type),count);\
+        growDarr(array,type,sizeof(type),count);\
         array.arr[array.len++]=(type)el;\
     } else{ array.arr[array.len++]=(type)el; } \
 } while(0)

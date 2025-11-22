@@ -3,8 +3,15 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 
+void Tinit(Table *Tinstance){
+    Tinstance->len=0;
+    Tinstance->arr=NULL;
+    growDarrPtr(Tinstance, Tnode, sizeof(Tnode), INIT_TABLE_SIZE);
+    memset(Tinstance->arr, 0, INIT_TABLE_SIZE);
+}
 
 void Tcopy(Table *Told, Table *Tnew) {
 
@@ -73,9 +80,12 @@ static inline bool Tgrow(Table Tcur,Table *Tnew){
         size_t cap=(size_t)(Tcur.len+1)/(LOAD_FACTOR_MIN);
         Table temp={.len=Tcur.len,.arr=NULL};
 
-        grow(temp, Tnode, sizeof(Tnode), cap);
+        growDarr(temp, Tnode, sizeof(Tnode), cap);
+        memset(temp.arr, 0, cap);
+
         temp.cap=cap;
         *Tnew=temp;
+
         return true;
     }
     return false;
