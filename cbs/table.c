@@ -1,9 +1,11 @@
 #include "table.h"
 #include "darray.h"
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+
 
 
 void Tinit(Table *Tinstance){
@@ -133,5 +135,54 @@ bool Tget(Table *Tinstance,BsObjString *key, Value *value){
     }
 
     *value=node->value;
+    return true;
+}
+
+BsObjString *Tgets(Table *Tinstance,BsObjString *key){
+    size_t cap=Tinstance->cap;
+    u_int32_t index=key->hash % cap;
+    Tnode *node=&Tinstance->arr[index];
+
+    while(node->key!=NULL || !(key->len == node->key->len && key->hash == node->key->hash && !memcmp(key->value, node->key->value, node->key->len))){
+        index=(index+1) % cap;
+        node=&Tinstance->arr[index];
+    }
+
+    if(node->key==NULL){
+        return NULL;
+    }
+
+    return node->key;
+}
+
+bool Tdelete(Table *Tinstance,BsObjString *key){
+    size_t cap=Tinstance->cap;
+    u_int32_t index=key->hash % cap;
+    Tnode *node=&Tinstance->arr[index];
+
+    while(node->key!=NULL || node->key!=key){
+        index=(index+1) % cap;
+        node=&Tinstance->arr[index];
+    }
+
+    if(node->key==NULL){
+        return false;
+    }
+
+    u_int32_t peekIndex=index;
+    Tnode *hole=node;
+
+    while(Tinstance->arr[peekIndex=((peekIndex+1) % cap)].key!=NULL){
+        hole=&Tinstance->arr[peekIndex];
+        bool sitsRightfully=(hole->key->hash % cap)==peekIndex;
+        //we skip nodes that are rightfully in their buckets
+        if(sitsRightfully)
+            continue;
+        *node=*hole;
+    }
+
+    hole->key=NULL;
+    Tinstance->len--;
+
     return true;
 }
