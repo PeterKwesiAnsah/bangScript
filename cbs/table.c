@@ -138,7 +138,7 @@ bool Tget(Table *Tinstance,BsObjString *key, Value *value){
     return true;
 }
 
-BsObjString *Tgets(Table *Tinstance,BsObjString *key){
+BsObjString *Tgets(Table *Tinstance,BsObjString *key, Value *value){
     size_t cap=Tinstance->cap;
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
@@ -151,7 +151,8 @@ BsObjString *Tgets(Table *Tinstance,BsObjString *key){
     if(node->key==NULL){
         return NULL;
     }
-
+    //All strings(from source) at compile time finds it way to the constant table, as with any value in the source, at runtime the VM needs a way to look it up
+    *value=node->value;
     return node->key;
 }
 

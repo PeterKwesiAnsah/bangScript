@@ -29,6 +29,6 @@ bool Tset(Table *,BsObjString *, Value);
 bool Tget(Table *,BsObjString *, Value *);
 bool Tdelete(Table *,BsObjString *);
 
-BsObjString *Tgets(Table *,BsObjString *);
+BsObjString *Tgets(Table *,BsObjString *,Value *);
 
 #endif
