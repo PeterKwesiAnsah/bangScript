@@ -2,12 +2,14 @@
 #include "chunk.h"
 #include "darray.h"
 #include "scanner.h"
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "line.h"
 #include "readonly.h"
+#include "table.h"
 
 #define WRITE_BYTECODE(chunk,byte,line) do{ \
 append(chunk,u_int8_t,byte);\
@@ -19,6 +21,8 @@ Parser parser={{},{},false};
 
 extern const char *src;
 extern const char *scanerr;
+//table of a set of unique(textually) BsObjString
+extern Table strings;
 extern DECLARE_ARRAY(u_int8_t, chunk);
 
 
@@ -190,16 +194,36 @@ static void number(){
     WRITE_BYTECODE(chunk, constantIndex, numToken.line);
 }
 static void string(){
-    Token strToken=parser.previous;
-    Value BsObjvalue;
-    BsObjvalue.type=TYPE_OBJ;
-    BsObjStringFromSource *objString=(BsObjStringFromSource *)malloc(sizeof(BsObjStringFromSource));
-    objString->obj=(BsObj){.type=OBJ_TYPE_STRING_SOURCE};
-    objString->value=src+strToken.start;
-    objString->len=strToken.len;
-    BsObjvalue.value.obj=(BsObj *) objString;
 
-    size_t stringLiteralIndex=addConstant(BsObjvalue);
+    Token strToken=parser.previous;
+    Value value;
+    size_t stringLiteralIndex;
+
+
+
+    BsObjStringFromSource *objString;
+
+    if((objString=(BsObjStringFromSource *)Tgets(&strings,&(BsObjString){.value=(char *)src+strToken.start,.len=strToken.len,.hash=0},&value))){
+        assert(value.type==TYPE_NUMBER);
+        stringLiteralIndex=value.value.num;
+    }else {
+        objString = (BsObjStringFromSource *)malloc(sizeof(BsObjStringFromSource));
+
+        objString->obj=(BsObj){.type=OBJ_TYPE_STRING_SOURCE};
+        objString->value=src+strToken.start;
+        objString->len=strToken.len;
+
+        value.value.obj=(BsObj *) objString;
+        value.type=TYPE_OBJ;
+        stringLiteralIndex=addConstant(value);
+
+        //unique, add to strings
+        Tset(&strings, (BsObjString *)objString, (Value){.type=TYPE_NUMBER,.value.num=stringLiteralIndex});
+    }
+
+    //All strings intern, have a place in the constant table
+    // Getting an original string means you can also get the original constant index
+    // which you can use instead so originalBSObjstring->originalBsObjstringValue which is of type number
 
     if(stringLiteralIndex >= CONSTANT_LIMIT){
         // Write opcode
