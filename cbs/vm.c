@@ -131,7 +131,7 @@ ProgramStatus run(){
                             if(BsObjStringA->len!=BsObjStringB->len){
                                 push(C_BOOL_TO_BS_BOOLEAN(false));
                             }else{
-                                push(C_BOOL_TO_BS_BOOLEAN(!memcmp(BsObjStringA->value, BsObjStringB->value, BsObjStringA->len)));
+                                push(C_BOOL_TO_BS_BOOLEAN(BsObjStringA->value== BsObjStringB->value));
                             }
                         }
                         break;
@@ -237,6 +237,8 @@ ProgramStatus run(){
                 break;
                 case TYPE_NUMBER:
                  printf("%f\n",BS_NUMBER_TO_C_DOUBLE(result));
+                 case TYPE_NIL:
+                 printf("null\n");
                 break;
             }
             }
