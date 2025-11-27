@@ -1,6 +1,5 @@
 #include "line.h"
 #include "darray.h"
-#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
