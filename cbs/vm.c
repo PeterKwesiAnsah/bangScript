@@ -63,33 +63,24 @@ ProgramStatus run(){
                     break;
                     case TYPE_OBJ:
                     {
-                         //switch ((a.value.obj)->type) {
-                             //case OBJ_TYPE_STRING_SOURCE:
-                             //{
-                                   // Operands a,b can be the same string type or different but they can be used interchangly because they have common fields
-                                    BsObjStringFromSource *BsObjStringA=(BsObjStringFromSource *)a.value.obj;
-                                    BsObjStringFromSource *BsObjStringB=(BsObjStringFromSource *)b.value.obj;
+                        // Operands a,b can be the same string type or different but they can be used interchangly because they have common fields
+                        BsObjStringFromSource *BsObjStringA=(BsObjStringFromSource *)a.value.obj;
+                        BsObjStringFromSource *BsObjStringB=(BsObjStringFromSource *)b.value.obj;
 
-                                    size_t ResultStrLen=BsObjStringA->len + BsObjStringB->len;
+                        size_t ResultStrLen=BsObjStringA->len + BsObjStringB->len;
 
-                                    BsObjStringFromAlloc *BsObjStringResult=(BsObjStringFromAlloc *)malloc(sizeof(BsObjStringFromAlloc)+ResultStrLen+1);
+                        BsObjStringFromAlloc *BsObjStringResult=(BsObjStringFromAlloc *)malloc(sizeof(BsObjStringFromAlloc)+ResultStrLen+1);
 
-                                    BsObjStringResult->value=(char *)(BsObjStringResult+(size_t)sizeof(BsObjStringFromAlloc));
-                                    BsObjStringResult->len=ResultStrLen;
+                        BsObjStringResult->value=(char *)(BsObjStringResult+(size_t)sizeof(BsObjStringFromAlloc));
+                        BsObjStringResult->len=ResultStrLen;
 
-                                    BsObjStringResult->obj=(BsObj){.type=OBJ_TYPE_STRING_ALLOC};
+                        BsObjStringResult->obj=(BsObj){.type=OBJ_TYPE_STRING_ALLOC};
 
-                                    memcpy(BsObjStringResult->value,BsObjStringA->value,BsObjStringA->len);
-                                    memcpy(BsObjStringResult->value + BsObjStringA->len,BsObjStringB->value,BsObjStringB->len);
+                        memcpy(BsObjStringResult->value,BsObjStringA->value,BsObjStringA->len);
+                        memcpy(BsObjStringResult->value + BsObjStringA->len,BsObjStringB->value,BsObjStringB->len);
 
-                                    BsObjStringResult->value[ResultStrLen]='\0';
-                                    push(CREATE_BS_OBJ(BsObjStringResult));
-                                    // }
-                             //break;
-                            // default:
-                             //fputs("Add requires operands to be either a number or a string type",stderr);
-                             //return ERROR;
-                             //}
+                        BsObjStringResult->value[ResultStrLen]='\0';
+                        push(CREATE_BS_OBJ(BsObjStringResult));
                     }
                     break;
                     default:
