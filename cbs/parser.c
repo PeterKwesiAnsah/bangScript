@@ -7,14 +7,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "line.h"
 #include "readonly.h"
 #include "table.h"
 
-#define WRITE_BYTECODE(chunk,byte,line) do{ \
-append(chunk,u_int8_t,byte);\
-addLine(line);\
-}while(0)
+
+
 
 
 Parser parser={{},{},false};
@@ -25,7 +22,7 @@ extern const char *scanerr;
 extern Table strings;
 extern DECLARE_ARRAY(u_int8_t, chunk);
 
-
+extern inline size_t internString(Table *, Token , const char *);
 
 
 ParseRule rules[] = {
@@ -48,7 +45,7 @@ ParseRule rules[] = {
     [TOKEN_GREATER_EQUAL] = {NULL,     binary,   PREC_COMPARISON},
     [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
-    [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_IDENTIFIER]    = {identifier,     NULL,   PREC_PRIMARY},
     [TOKEN_STRING]        = {string,   NULL, PREC_NONE},
     [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
     [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
@@ -103,8 +100,8 @@ void expression(){
         return;
     }
     advance();
-    WRITE_BYTECODE(chunk,OP_PRINT, 0);
-    WRITE_BYTECODE(chunk,OP_RETURN, 0);
+    //WRITE_BYTECODE(chunk,OP_PRINT, 0);
+    //WRITE_BYTECODE(chunk,OP_RETURN, 0);
 }
 void grouping(){
     parsePrecedence(PREC_ASSIGNMENT);
@@ -197,33 +194,8 @@ static void string(){
 
     Token strToken=parser.previous;
     Value value;
-    size_t stringLiteralIndex;
 
-
-
-    BsObjStringFromSource *objString;
-
-    if((objString=(BsObjStringFromSource *)Tgets(&strings,&(BsObjString){.value=(char *)src+strToken.start,.len=strToken.len,.hash=0},&value))){
-        assert(value.type==TYPE_NUMBER);
-        stringLiteralIndex=value.value.num;
-    }else {
-        objString = (BsObjStringFromSource *)malloc(sizeof(BsObjStringFromSource));
-
-        objString->obj=(BsObj){.type=OBJ_TYPE_STRING_SOURCE};
-        objString->value=src+strToken.start;
-        objString->len=strToken.len;
-
-        value.value.obj=(BsObj *) objString;
-        value.type=TYPE_OBJ;
-        stringLiteralIndex=addConstant(value);
-
-        //unique, add to strings
-        Tset(&strings, (BsObjString *)objString, (Value){.type=TYPE_NUMBER,.value.num=stringLiteralIndex});
-    }
-
-    //All strings intern, have a place in the constant table
-    // Getting an original string means you can also get the original constant index
-    // which you can use instead so originalBSObjstring->originalBsObjstringValue which is of type number
+    size_t stringLiteralIndex=internString(&strings, strToken, src);
 
     if(stringLiteralIndex >= CONSTANT_LIMIT){
         // Write opcode
@@ -247,6 +219,14 @@ static void boolean(){
     WRITE_BYTECODE(chunk, OP_CONSTANT, boolToken.line);
     //write operand Index
     WRITE_BYTECODE(chunk, (boolToken.tt==TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX:CONSTANT_FALSE_BOOL_INDEX),boolToken.line);
+}
+
+static void identifier(){
+  Token identifierToken=parser.previous;
+
+  size_t BsobjStringConstIndex=internString(&strings, identifierToken, src);
+  WRITE_BYTECODE(chunk, OP_GLOBALVAR_GET, identifierToken.line);
+  WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
 }
 static void nil(){
     Token nilToken=parser.previous;
