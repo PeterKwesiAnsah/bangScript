@@ -3,6 +3,8 @@
 #include "darray.h"
 #include "readonly.h"
 #include "stack.h"
+#include "table.h"
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,9 +21,12 @@
 extern DECLARE_ARRAY(Value, constants);
 extern DECLARE_ARRAY(u_int8_t, chunk);
 
+Table globals={};
+
 uint8_t *ip=NULL;
 
 ProgramStatus run(){
+    Tinit(&globals);
     ip=chunk.arr;
     for(;;){
         switch(READ_BYTE_CODE(ip)){
@@ -233,7 +238,38 @@ ProgramStatus run(){
                 break;
             }
             }
-            break;
+                break;
+            //TODO: OP_GLOBALVAR_LONG_DEF
+            case OP_GLOBALVAR_DEF:{
+                uint8_t varConstIndex = READ_BYTE_CODE(ip);
+                Value variableNameValue= constants.arr[varConstIndex];
+                assert(variableNameValue.type==TYPE_OBJ);
+                Value evalrhs=pop();
+                Tset(&globals, (BsObjString *)variableNameValue.value.obj, evalrhs);
+            }
+                break;
+            case OP_GLOBALVAR_GET:
+            {
+                uint8_t varConstIndex = READ_BYTE_CODE(ip);
+                Value variableNameValue= constants.arr[varConstIndex];
+                assert(variableNameValue.type==TYPE_OBJ);
+                Value value;
+                //TODO: check for undefined vars
+                Tget(&globals, (BsObjString *)variableNameValue.value.obj, &value);
+
+            }
+                break;
+            case OP_GLOBALVAR_ASSIGN:
+            {
+                uint8_t varConstIndex = READ_BYTE_CODE(ip);
+                Value variableNameValue= constants.arr[varConstIndex];
+                assert(variableNameValue.type==TYPE_OBJ);
+                Value evalrhs=pop();
+                //TODO: check for undefined vars
+                Tset(&globals, (BsObjString *)variableNameValue.value.obj, evalrhs);
+
+            }
+                break;
             case OP_RETURN:
              return SUCCESS;
             default:
