@@ -19,7 +19,7 @@ PREC_CALL, // . ()
 PREC_PRIMARY
 } Precedence;
 
-typedef void (*ParseFn)();
+typedef void (*ParseFn)(bool isAssignExp);
 typedef struct {
 ParseFn prefix;
 ParseFn infix;
@@ -36,11 +36,12 @@ static void parsePrecedence(Precedence precedence);
 void advance();
 
 //production rules for expressions
-static void number();
-static void string();
-static void grouping();
-static void unary();
-static void binary();
-static void boolean();
-static void nil();
+static void number(bool);
+static void string(bool);
+static void grouping(bool);
+static void unary(bool);
+static void binary(bool);
+static void boolean(bool);
+static void identifier(bool);
+static void nil(bool);
 #endif

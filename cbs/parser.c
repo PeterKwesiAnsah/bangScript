@@ -2,7 +2,6 @@
 #include "chunk.h"
 #include "darray.h"
 #include "scanner.h"
-#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -83,12 +82,12 @@ static void parsePrecedence(Precedence precedence) {
         parser.hadError=true;
         return;
     }
-    prefixRule();
+    prefixRule(precedence==PREC_ASSIGNMENT);
 
 while (precedence <= rules[parser.current.tt].precedence) {
     advance();
     ParseFn infixRule = rules[parser.previous.tt].infix;
-    infixRule();
+    infixRule(precedence==PREC_ASSIGNMENT);
     }
 }
 
@@ -103,7 +102,7 @@ void expression(){
     //WRITE_BYTECODE(chunk,OP_PRINT, 0);
     //WRITE_BYTECODE(chunk,OP_RETURN, 0);
 }
-void grouping(){
+void grouping(bool isAssignExp ){
     parsePrecedence(PREC_ASSIGNMENT);
     if(parser.current.tt!=TOKEN_RIGHT_PAREN){
         fprintf(stderr,"Expected Right Paren but got %d\n",parser.current.tt);
@@ -113,7 +112,7 @@ void grouping(){
     advance();
 }
 
-static void binary() {
+static void binary(bool isAssignExp) {
     TokenType operatorType = parser.previous.tt;
     unsigned int line=parser.previous.line;
     parsePrecedence((Precedence)(rules[parser.previous.tt].precedence + 1));
@@ -157,7 +156,7 @@ static void binary() {
 
 
 
-void unary (){
+void unary (bool isAssignExp){
     Token token=parser.previous;
 
     switch (token.tt) {
@@ -173,7 +172,7 @@ void unary (){
     }
 }
 
-static void number(){
+static void number(bool isAssignExp){
     Token numToken=parser.previous;
     size_t constantIndex=addConstant(C_DOUBLE_TO_BS_NUMBER(atof(src+numToken.start)));
     if(constantIndex >= CONSTANT_LIMIT){
@@ -190,7 +189,7 @@ static void number(){
     //write operand Index
     WRITE_BYTECODE(chunk, constantIndex, numToken.line);
 }
-static void string(){
+static void string(bool isAssignExp){
 
     Token strToken=parser.previous;
     Value value;
@@ -213,7 +212,7 @@ static void string(){
     WRITE_BYTECODE(chunk, stringLiteralIndex, strToken.line);
 }
 
-static void boolean(){
+static void boolean(bool isAssignExp){
     Token boolToken=parser.previous;
     //write opCode
     WRITE_BYTECODE(chunk, OP_CONSTANT, boolToken.line);
@@ -221,14 +220,21 @@ static void boolean(){
     WRITE_BYTECODE(chunk, (boolToken.tt==TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX:CONSTANT_FALSE_BOOL_INDEX),boolToken.line);
 }
 
-static void identifier(){
+static void identifier(bool isAssignExp){
   Token identifierToken=parser.previous;
 
   size_t BsobjStringConstIndex=internString(&strings, identifierToken, src);
+  if(isAssignExp && parser.current.tt==TOKEN_EQUAL){
+      advance();
+      expression();
+      WRITE_BYTECODE(chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
+      WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
+      return;
+  }
   WRITE_BYTECODE(chunk, OP_GLOBALVAR_GET, identifierToken.line);
   WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
 }
-static void nil(){
+static void nil(bool isAssignExp){
     Token nilToken=parser.previous;
     WRITE_BYTECODE(chunk, OP_CONSTANT, nilToken.line);
     //write operand Index
