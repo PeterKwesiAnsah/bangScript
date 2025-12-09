@@ -255,10 +255,18 @@ ProgramStatus run(){
                 assert(variableNameValue.type==TYPE_OBJ);
                 Value value;
                 //TODO: check for undefined vars
-                Tget(&globals, (BsObjString *)variableNameValue.value.obj, &value);
+                if(Tget(&globals, (BsObjString *)variableNameValue.value.obj, &value)){
+                    push(value);
+                    break;
+                };
+                fprintf(stderr, "%.*s is undefined.\n",
+                    ((BsObjStringFromSource *)variableNameValue.value.obj)->len,
+                    ((BsObjStringFromSource *)variableNameValue.value.obj)->value);
+                return ERROR;
 
             }
                 break;
+            //TODO: OP_GLOBALVAR_LONG_ASSIGN
             case OP_GLOBALVAR_ASSIGN:
             {
                 uint8_t varConstIndex = READ_BYTE_CODE(ip);
@@ -266,7 +274,12 @@ ProgramStatus run(){
                 assert(variableNameValue.type==TYPE_OBJ);
                 Value evalrhs=pop();
                 //TODO: check for undefined vars
-                Tset(&globals, (BsObjString *)variableNameValue.value.obj, evalrhs);
+                if(Tset(&globals, (BsObjString *)variableNameValue.value.obj, evalrhs)){
+                    fprintf(stderr, "%.*s is undefined.\n",
+                        ((BsObjStringFromSource *)variableNameValue.value.obj)->len,
+                        ((BsObjStringFromSource *)variableNameValue.value.obj)->value);
+                    return ERROR;
+                };
 
             }
                 break;
