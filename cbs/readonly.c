@@ -9,7 +9,7 @@ Table strings={};
 
 
 
-inline size_t internString(Table *strings, Token token, const char *src) {
+ size_t internString(Table *strings, Token token, const char *src) {
     Value val;
     // Create a temporary stack object for lookup
     BsObjString lookupKey = { .value = (char*)src + token.start, .len = token.len };
@@ -36,7 +36,11 @@ inline size_t internString(Table *strings, Token token, const char *src) {
 
         // Store index in string table for future lookups
         Value indexVal = { .type = TYPE_NUMBER, .value.num = outIndex };
+
+        TABLE_EXPAND(strings);
+
         Tset(strings, (BsObjString *)newObj, indexVal);
+
         return outIndex;
     }
 }

@@ -1,10 +1,16 @@
 //Number Constants and String literals
 #ifndef READONLY_H
 #define READONLY_H
-#include "darray.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "darray.h"
+#include "assert.h"
+#include "scanner.h"
+//#include "table.h"
+
 #define CONSTANT_LIMIT 256
 #define CONSTANT_LONG_LIMIT 16777216
 
@@ -77,5 +83,8 @@ typedef struct {
 
 #define C_BOOL_TO_BS_BOOLEAN(cbool) ((Value){.value={.boolean=cbool},.type=TYPE_BOOL})
 #define BS_BOOLEAN_TO_C_BOOL(bsbool) (bsbool.value.boolean)
+
 size_t addConstant(Value);
+
+//inline size_t internString(Table *, BsObjString **, Token , const char *);
 #endif

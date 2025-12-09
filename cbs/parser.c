@@ -99,8 +99,6 @@ void expression(){
         return;
     }
     advance();
-    //WRITE_BYTECODE(chunk,OP_PRINT, 0);
-    //WRITE_BYTECODE(chunk,OP_RETURN, 0);
 }
 void grouping(bool isAssignExp ){
     parsePrecedence(PREC_ASSIGNMENT);
@@ -227,6 +225,7 @@ static void identifier(bool isAssignExp){
   if(isAssignExp && parser.current.tt==TOKEN_EQUAL){
       advance();
       expression();
+      //TODO: Handle long indexes
       WRITE_BYTECODE(chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
       WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
       return;

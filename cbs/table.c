@@ -14,7 +14,7 @@ void Tinit(Table *Tinstance){
     memset(Tinstance->arr, 0, INIT_TABLE_SIZE);
 }
 
-void Tcopy(Table *Told, Table *Tnew) {
+void Tcopy(const Table *Told, Table *Tnew) {
 
     size_t cap = Told->cap;
     Tnode *Toldarr = Told->arr;
@@ -73,17 +73,17 @@ void Tcopy(Table *Told, Table *Tnew) {
         node->key = Toldarr[i].key;
         node->value = Toldarr[i].value;
     }
+    //TODO: free Told
 }
 // returns true if Tcur is closer to LOAD_FACTOR_MAX, false otherwise
-static inline bool Tgrow(Table Tcur,Table *Tnew){
-    if(((double)(Tcur.len+1)/(Tcur.cap))>= LOAD_FACTOR_MAX){
+bool Tgrow(Table *Tcur,Table *Tnew){
+    if(((double)(Tcur->len+1)/(Tcur->cap))>= LOAD_FACTOR_MAX){
 
-        size_t cap=(size_t)(Tcur.len+1)/(LOAD_FACTOR_MIN);
-        Table temp={.len=Tcur.len,.arr=NULL};
+        size_t cap=(size_t)(Tcur->len+1)/(LOAD_FACTOR_MIN);
+        Table temp={.len=Tcur->len,.arr=NULL};
 
         growDarr(temp, Tnode, sizeof(Tnode), cap);
         memset(temp.arr, 0, cap);
-
         temp.cap=cap;
         *Tnew=temp;
 
