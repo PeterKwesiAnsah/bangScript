@@ -1,4 +1,3 @@
-#include "darray.h"
+#include "chunk.h"
 
-
-DECLARE_ARRAY(u_int8_t, chunk)={};
+Chunk chunk={};
