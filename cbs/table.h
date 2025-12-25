@@ -8,6 +8,15 @@
 #define LOAD_FACTOR_MIN 0.1
 #define INIT_TABLE_SIZE 256
 
+#define TABLE_EXPAND(tbl_ptr)               \
+    do {                                   \
+        Table _tnew;                       \
+        if (Tgrow((tbl_ptr), &_tnew)) {    \
+            Tcopy((tbl_ptr), &_tnew);      \
+            *(tbl_ptr) = _tnew;            \
+        }                                  \
+    } while (0)
+
 struct KVnode {
 BsObjString *key;
 Value value;
@@ -21,8 +30,8 @@ DECLARE_ARRAY_TYPE(Tnode,Table);
 
 void Tinit(Table *);
 
-static bool Tgrow(Table, Table *);
-void Tcopy(Table *,Table *);
+bool Tgrow(Table *, Table *);
+void Tcopy(const Table *,Table *);
 
 
 bool Tset(Table *,BsObjString *, Value);
@@ -30,5 +39,6 @@ bool Tget(Table *,BsObjString *, Value *);
 bool Tdelete(Table *,BsObjString *);
 
 BsObjString *Tgets(Table *,BsObjString *,Value *);
+bool Tsets(Table *Tinstance,BsObjString *key, Value value);
 
 #endif
