@@ -128,19 +128,12 @@ bool Tsets(Table *Tinstance,BsObjString *key, Value value){
         node=&Tinstance->arr[index];
     }
 
-
-    bool isEmpty=node->key==NULL;
-    if(node->key==key){
-        //filled node
-        node->value=value;
-        return false;
-    }
     //regular empty node
     node->key=key;
     node->value=value;
     Tinstance->len++;
 
-    return isEmpty;
+    return true;
 }
 
 //true if entry was  found, false otherwise
