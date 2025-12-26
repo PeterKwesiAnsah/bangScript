@@ -8,11 +8,19 @@ DECLARE_ARRAY(Value, constants)={};
 Table strings={};
 
 
+static uint32_t hashString(const char* key, int length) {
+    uint32_t hash = 2166136261u;
+    for (int i = 0; i < length; i++) {
+        hash ^= (uint8_t)key[i];
+        hash *= 16777619;
+    }
+    return hash;
+}
 
  size_t internString(Table *strings, Token token, const char *src) {
     Value val;
     // Create a temporary stack object for lookup
-    BsObjString lookupKey = { .value = (char*)src + token.start, .len = token.len };
+    BsObjString lookupKey = { .value = (char *) src + token.start, .len = token.len, .hash=hashString(src + token.start, token.len) };
 
     // Check if it exists
     BsObjString *found = (BsObjString *)Tgets(strings, &lookupKey, &val);
@@ -26,6 +34,7 @@ Table strings={};
         newObj->obj.type = OBJ_TYPE_STRING_SOURCE;
         newObj->value = src + token.start;
         newObj->len = token.len;
+        newObj->hash=hashString((char *)src + token.start,token.len);
 
         // Wrap in Value for the constant table
         Value newVal;
@@ -39,7 +48,7 @@ Table strings={};
 
         TABLE_EXPAND(strings);
 
-        Tset(strings, (BsObjString *)newObj, indexVal);
+        Tsets(strings, (BsObjString *)newObj, indexVal);
 
         return outIndex;
     }
