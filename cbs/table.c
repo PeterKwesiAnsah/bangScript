@@ -160,14 +160,17 @@ BsObjString *Tgets(Table *Tinstance,BsObjString *key, Value *value){
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
 
-    while(node->key!=NULL || !(key->len == node->key->len && key->hash == node->key->hash && !memcmp(key->value, node->key->value, node->key->len))){
+
+    while(node->key!=NULL && !(key->len == node->key->len && key->hash == node->key->hash && !memcmp(key->value, node->key->value, node->key->len))){
         index=(index+1) % cap;
         node=&Tinstance->arr[index];
     }
 
+
     if(node->key==NULL){
         return NULL;
     }
+
     //All strings(from source) at compile time finds it way to the constant table, as with any value in the source, at runtime the VM needs a way to look it up
     *value=node->value;
     return node->key;
