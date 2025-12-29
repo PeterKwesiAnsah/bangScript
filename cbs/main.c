@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,11 +16,29 @@ typedef enum {
 const char *src;
 OperationMode mode=SCRIPT_MODE;
 
+inline const char * readSourceFintoBuffer(const char *filename){
+    assert(filename);
+    FILE *fp=fopen(filename, "r");
+    if (fp==NULL){
+        fprintf(stderr, "Failed to open File.Perhaps path to file is incorrect");
+        exit(1);
+    }
+    fseek(fp, 0L, SEEK_END);
+    size_t fileSize = ftell(fp);
+    rewind(fp);
+    char *buffer=(char *)malloc(fileSize + 1);
+    size_t bytesRead = fread(buffer, sizeof(char), fileSize, fp);
+    buffer[bytesRead] = '\0';
+    src=buffer;
+    fclose(fp);
+    return src;
+}
+
 int main(int argc,char *args[]){
+    const char *filename=NULL;
     if (argc==1){
     mode=REPL_MODE;
     }else{
-        //run in script mode
         // bangscript --help
         // bangscript -h
         // bangscript <filename> --disassembler
@@ -27,7 +46,7 @@ int main(int argc,char *args[]){
         // bangscript <filename>
         const char * flags[]={[DISASSEMBLER_MODE]="diassembler",[HELP_MODE]="help"};
 
-        for(int i=1;i<argc-1;i++){
+        for(int i=1;i<argc;i++){
             const char * arg=args[i];
             switch (*arg++) {
                 case '-':{
@@ -39,6 +58,7 @@ int main(int argc,char *args[]){
                             if(strlen(args[i])==2){
                                 //help shorthand
                                 mode=HELP_MODE;
+                                break;
                             }
                             fprintf(stderr, "Unknown flag: %s\n", arg);
                             exit(1);
@@ -52,10 +72,10 @@ int main(int argc,char *args[]){
                             if(strlen(args[i])==2){
                                 //help shorthand
                                 mode=DISASSEMBLER_MODE;
+                                break;
                             }
                             fprintf(stderr, "Unknown flag: %s\n", arg);
                             exit(1);
-
                         }
                         break;
                         case '-':{
@@ -71,37 +91,37 @@ int main(int argc,char *args[]){
                         break;
                         default:
                         //invalid command
+                        fprintf(stderr, "Unknown flag: %s\n", arg);
+                        exit(1);
                         break;
                     }
                 }
                 break;
                 default:
-                //must be file name
+                filename=arg;
                 break;
             }
         }
-
-        FILE *fp=fopen(args[1], "r");
-        if (fp==NULL){
-            fprintf(stderr, "Failed to open File.Perhaps path to file is incorrect");
-            exit(1);
+        switch (mode) {
+            case REPL_MODE:
+            break;
+            case HELP_MODE:
+            break;
+            case DISASSEMBLER_MODE:{
+               src=readSourceFintoBuffer(filename);
+               return compile(src);
+            }
+            break;
+            case SCRIPT_MODE:{
+                src=readSourceFintoBuffer(filename);
+                CompilerStatus status=compile(src);
+                if(status== COMPILER_ERROR) return status;
+                return run();
+            }
+            break;
+            default:
+            break;
         }
-        fseek(fp, 0L, SEEK_END);
-        size_t fileSize = ftell(fp);
-        rewind(fp);
-        char *buffer=(char *)malloc(fileSize + 1);
-        size_t bytesRead = fread(buffer, sizeof(char), fileSize, fp);
-        buffer[bytesRead] = '\0';
-        src=buffer;
-        fclose(fp);
-
-        CompilerStatus status=compile(src);
-        if(status== COMPILER_ERROR) return status;
-
-        return run();
-    }//else{
-        //fprintf(stderr,"Usage: %s [path to script]\n",args[0]);
-        //exit(1);
-    //}
+    }
     return 0;
 }
