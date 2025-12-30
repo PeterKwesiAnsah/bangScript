@@ -98,24 +98,23 @@ bool Tset(Table *Tinstance,BsObjString *key, Value value){
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
 
-    while(node->key!=NULL || node->key!=key){
+    while(node->key!=NULL && node->key!=key){
         index=(index+1) % cap;
         node=&Tinstance->arr[index];
     }
 
-
-    bool isEmpty=node->key==NULL;
     if(node->key==key){
         //filled node
         node->value=value;
         return false;
     }
+
     //regular empty node
     node->key=key;
     node->value=value;
     Tinstance->len++;
 
-    return isEmpty;
+    return true;
 }
 
 bool Tsets(Table *Tinstance,BsObjString *key, Value value){
@@ -142,7 +141,7 @@ bool Tget(Table *Tinstance,BsObjString *key, Value *value){
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
 
-    while(node->key!=NULL || node->key!=key){
+    while(node->key!=key && node->key!=NULL){
         index=(index+1) % cap;
         node=&Tinstance->arr[index];
     }
@@ -181,7 +180,7 @@ bool Tdelete(Table *Tinstance,BsObjString *key){
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
 
-    while(node->key!=NULL || node->key!=key){
+    while(node->key!=NULL && node->key!=key){
         index=(index+1) % cap;
         node=&Tinstance->arr[index];
     }
