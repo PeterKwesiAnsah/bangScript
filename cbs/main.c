@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "compiler.h"
 #include "vm.h"
+#include "disassembler.h"
 
 
 typedef enum {
@@ -16,11 +17,12 @@ typedef enum {
 const char *src;
 OperationMode mode=SCRIPT_MODE;
 
-inline const char * readSourceFintoBuffer(const char *filename){
+const char * readSourceFintoBuffer(const char *filename){
     assert(filename);
+
     FILE *fp=fopen(filename, "r");
     if (fp==NULL){
-        fprintf(stderr, "Failed to open File.Perhaps path to file is incorrect");
+        perror("Failed to open file");
         exit(1);
     }
     fseek(fp, 0L, SEEK_END);
@@ -48,8 +50,9 @@ int main(int argc,char *args[]){
 
         for(int i=1;i<argc;i++){
             const char * arg=args[i];
-            switch (*arg++) {
+            switch (*arg) {
                 case '-':{
+                    arg++;
                     //handle flag options
                     switch (*arg++) {
                         case 'h':{
@@ -79,7 +82,6 @@ int main(int argc,char *args[]){
                         }
                         break;
                         case '-':{
-                            //dissembler or help
                             for(int j=0; j < sizeof(flags) / sizeof *flags;j++){
                                 unsigned int flagLen=strlen(flags[j]);
                                 if(flagLen==strlen(arg) && !memcmp(flags[j], arg,flagLen)){
@@ -109,7 +111,9 @@ int main(int argc,char *args[]){
             break;
             case DISASSEMBLER_MODE:{
                src=readSourceFintoBuffer(filename);
-               return compile(src);
+               CompilerStatus status=compile(src);
+               if(status==COMPILER_ERROR) return status;
+               return disassembleChunk(filename);
             }
             break;
             case SCRIPT_MODE:{
