@@ -30,7 +30,8 @@ ProgramStatus run(){
     ip=chunk.arr;
     for(;;){
         switch(READ_BYTE_CODE(ip)){
-            case OP_CONSTANT_ZER0:{
+            case OP_CONSTANT_ZER0:
+            {
                 Value value= constants.arr[CONSTANT_ZERO_INDEX];
                 push(value);
             }
@@ -233,35 +234,36 @@ ProgramStatus run(){
                 break;
                 case TYPE_NUMBER:
                  printf("%f\n",BS_NUMBER_TO_C_DOUBLE(result));
+                 break;
                  case TYPE_NIL:
                  printf("null\n");
                 break;
             }
             }
-                break;
+            break;
             //TODO: OP_GLOBALVAR_LONG_DEF
             case OP_GLOBALVAR_DEF:{
                 uint8_t varConstIndex = READ_BYTE_CODE(ip);
-                Value variableNameValue= constants.arr[varConstIndex];
-                assert(variableNameValue.type==TYPE_OBJ);
+                Value var= constants.arr[varConstIndex];
+                assert(var.type==TYPE_OBJ);
                 Value evalrhs=pop();
-                Tset(&globals, (BsObjString *)variableNameValue.value.obj, evalrhs);
+                Tset(&globals, (BsObjString *)var.value.obj, evalrhs);
             }
                 break;
             case OP_GLOBALVAR_GET:
             {
                 uint8_t varConstIndex = READ_BYTE_CODE(ip);
-                Value variableNameValue= constants.arr[varConstIndex];
-                assert(variableNameValue.type==TYPE_OBJ);
+                Value var= constants.arr[varConstIndex];
+                assert(var.type==TYPE_OBJ);
                 Value value;
                 //TODO: check for undefined vars
-                if(Tget(&globals, (BsObjString *)variableNameValue.value.obj, &value)){
+                if(Tget(&globals, (BsObjString *)var.value.obj, &value)){
                     push(value);
                     break;
                 };
                 fprintf(stderr, "%.*s is undefined.\n",
-                    ((BsObjStringFromSource *)variableNameValue.value.obj)->len,
-                    ((BsObjStringFromSource *)variableNameValue.value.obj)->value);
+                    ((BsObjStringFromSource *)var.value.obj)->len,
+                    ((BsObjStringFromSource *)var.value.obj)->value);
                 return ERROR;
 
             }
@@ -270,14 +272,14 @@ ProgramStatus run(){
             case OP_GLOBALVAR_ASSIGN:
             {
                 uint8_t varConstIndex = READ_BYTE_CODE(ip);
-                Value variableNameValue= constants.arr[varConstIndex];
-                assert(variableNameValue.type==TYPE_OBJ);
+                Value var= constants.arr[varConstIndex];
+                assert(var.type==TYPE_OBJ);
                 Value evalrhs=pop();
                 //TODO: check for undefined vars
-                if(Tset(&globals, (BsObjString *)variableNameValue.value.obj, evalrhs)){
+                if(Tset(&globals, (BsObjString *)var.value.obj, evalrhs)){
                     fprintf(stderr, "%.*s is undefined.\n",
-                        ((BsObjStringFromSource *)variableNameValue.value.obj)->len,
-                        ((BsObjStringFromSource *)variableNameValue.value.obj)->value);
+                        ((BsObjStringFromSource *)var.value.obj)->len,
+                        ((BsObjStringFromSource *)var.value.obj)->value);
                     return ERROR;
                 };
 
