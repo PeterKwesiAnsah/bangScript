@@ -116,7 +116,7 @@ DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
     }
 
     // Print: Line | Offset | Opcode
-    printf("%4d | %04zu | %-20s | ", line, offset, opcodeNames[instruction]);
+    printf("%4d | %06zu | %-20s | ", line, offset, opcodeNames[instruction]);
     ip++;
 
     switch (instruction) {
