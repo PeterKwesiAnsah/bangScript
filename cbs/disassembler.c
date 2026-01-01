@@ -103,9 +103,11 @@ static void printConstantLong(unsigned int constantIndex) {
     }
 }
 
+
+//Handle Line Information
 DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
     size_t offset = ip - start;
-    printf("%04zu ", offset);
+    int line = getLine(offset);
 
     BS_OP_CODES instruction = *ip;
     if (instruction > OP_RETURN || instruction < OP_CONSTANT_ZER0) {
@@ -113,22 +115,20 @@ DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
         return DISASSEMBLER_ERROR;
     }
 
-    printf("%-20s", opcodeNames[instruction]);
+    // Print: Line | Offset | Opcode
+    printf("%4d | %04zu | %-20s | ", line, offset, opcodeNames[instruction]);
     ip++;
 
     switch (instruction) {
         case OP_CONSTANT_ZER0:
-            printf(" (constant 0: ");
+            printf("constant[0] = ");
             printConstant(CONSTANT_ZERO_INDEX);
-            printf(")");
             break;
 
         case OP_CONSTANT: {
             uint8_t constantIndex = *ip++;
-            //I have a constant for symbols, string, literals and numbers
-            printf(" (%d -> ", constantIndex);
+            printf("constant[%3d] = ", constantIndex);
             printConstant(constantIndex);
-            printf(")");
             break;
         }
 
@@ -140,9 +140,8 @@ DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
             constantIndex = constantIndex | lowByte;
             constantIndex = constantIndex | ((unsigned int)midByte << 8);
             constantIndex = constantIndex | ((unsigned int)highByte << 16);
-            printf(" (%u: ", constantIndex);
+            printf("constant[%6u] = ", constantIndex);
             printConstantLong(constantIndex);
-            printf(")");
             break;
         }
 
@@ -150,9 +149,8 @@ DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
         case OP_GLOBALVAR_GET:
         case OP_GLOBALVAR_ASSIGN: {
             uint8_t varConstIndex = *ip++;
-            printf(" (var at %d -> ", varConstIndex);
+            printf("constant[%3d] = ", varConstIndex);
             printConstant(varConstIndex);
-            printf(")");
             break;
         }
 
@@ -169,11 +167,11 @@ DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
         case OP_GREATOR_NOT:
         case OP_PRINT:
         case OP_RETURN:
-            // No operands
+            // No additional details needed
             break;
 
         default:
-            printf(" <unhandled instruction>");
+            printf("<unhandled instruction>");
             return DISASSEMBLER_ERROR;
     }
 
@@ -183,7 +181,10 @@ DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
 
 DisassemblerStatus disassembleChunk(const char *filename) {
 
-    printf("== %s disassembly ==\n", filename);
+    printf("\n");
+    printf("===== Disassembly of '%s' =====\n", filename);
+    printf("LINE | OFFSET | INSTRUCTION          | DETAILS\n");
+    printf("-----|--------|----------------------|----------------------------------\n");
 
     if (chunk.len == 0) {
         printf("<empty chunk>\n");
@@ -243,6 +244,6 @@ DisassemblerStatus disassembleChunk(const char *filename) {
         }
     }
 
-    printf("== end disassembly ==\n");
+    printf("===== End of Disassembly =====\n\n");
     return DISASSEMBLER_OK;
 }
