@@ -107,7 +107,7 @@ static void printConstantLong(unsigned int constantIndex) {
 //Handle Line Information
 DisassemblerStatus disassembleInstruction(uint8_t *ip, uint8_t *start) {
     size_t offset = ip - start;
-    int line = getLine(offset);
+    int line = getLineFast(offset);
 
     BS_OP_CODES instruction = *ip;
     if (instruction > OP_RETURN || instruction < OP_CONSTANT_ZER0) {
