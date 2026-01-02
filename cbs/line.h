@@ -6,4 +6,5 @@
 
 void addLine(unsigned);
 unsigned getLine(size_t);
+unsigned getLineFast(size_t);
 #endif

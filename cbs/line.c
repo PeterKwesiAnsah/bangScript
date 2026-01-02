@@ -1,32 +1,35 @@
 #include "line.h"
 #include "darray.h"
-#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
-unsigned int curlineNum=0;
-uint8_t occur=0;
-uint8_t *cur;
 
-unsigned int prevTotal=0;
-size_t prevSumIndex=0;
+struct {
+    uint8_t *cur;
+    unsigned curlineNum;
+    uint8_t occur;
+} AddLineInfoTracker;
+
+
+struct {
+    size_t prevLine;
+    unsigned prevtotalLineOffsets;
+} GetLineInfoTrackerFast;
+
 
 //TODO: line start,line end
 
 // lines[index] -> (offset - 1) , the last bytecode offset for line number(index)
 DECLARE_ARRAY(uint8_t, lines);
 
-
-
 //indexes of arr, ranges from  0 to n-1 , where in reality are line numbers 1 to n
 void addLine(unsigned int line){
 
-    assert(line !=0);
-    if(line==curlineNum){
-        *cur+=1;
+    if(line==AddLineInfoTracker.curlineNum){
+        *AddLineInfoTracker.cur+=1;
         return;
     }
-    curlineNum=line;
+    AddLineInfoTracker.curlineNum=line;
 
     while(line!=lines.len){
         //fill in the holes
@@ -35,29 +38,29 @@ void addLine(unsigned int line){
 
     size_t curIdx=lines.len;
     append(lines,uint8_t, 1);
-    cur=&lines.arr[curIdx];
+    AddLineInfoTracker.cur=&lines.arr[curIdx];
 }
 
 unsigned int getLine(size_t offset){
 
-    size_t sum=lines.arr[1];
-    size_t i=1;
+    size_t totalLineOffsets=lines.arr[1];
+    size_t line=1;
 
-    for(; offset+1 > sum && i < lines.len;i++){
-        sum+=lines.arr[i];
+    for(; offset+1 > totalLineOffsets && line+1 < lines.len;line++){
+        totalLineOffsets+=lines.arr[line+1];
     }
 
-    return i;
+    return line;
 }
 
 //getLineFast caches previous sums, applicable when we are getting line information sequentially
 unsigned int getLineFast(size_t offset){
-    size_t sum=prevTotal;
-    size_t i;
-    for(i=prevSumIndex; offset>sum;i++){
-        sum+=lines.arr[i];
+    size_t prevtotalLineOffsets=GetLineInfoTrackerFast.prevtotalLineOffsets;
+    size_t prevLine=GetLineInfoTrackerFast.prevLine;
+    for(; offset+1 > prevtotalLineOffsets && prevLine+1 < lines.len; prevLine++){
+        prevtotalLineOffsets+=lines.arr[prevLine+1];
     }
-    prevTotal=sum;
-    prevSumIndex=i;
-    return i+1;
+    prevtotalLineOffsets=prevtotalLineOffsets;
+    prevLine=prevLine;
+    return prevLine;
 }
