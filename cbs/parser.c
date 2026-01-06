@@ -23,7 +23,6 @@ extern DECLARE_ARRAY(u_int8_t, chunk);
 
 extern inline size_t internString(Table *, Token , const char *);
 
-
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
     [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
@@ -145,7 +144,6 @@ static void binary(bool isAssignExp) {
         case TOKEN_LESS_EQUAL:
             WRITE_BYTECODE(chunk, OP_GREATOR_NOT,line);
             break;
-
         default:
             return; // Unreachable.
     }
@@ -160,7 +158,7 @@ void unary (bool isAssignExp){
     switch (token.tt) {
         case TOKEN_MINUS:
         {
-            WRITE_BYTECODE(chunk, OP_CONSTANT_ZER0,0 );
+            WRITE_BYTECODE(chunk, OP_CONSTANT_ZER0,token.line );
             parsePrecedence(PREC_UNARY);
             WRITE_BYTECODE(chunk, OP_SUB,token.line);
         }
@@ -190,7 +188,7 @@ static void number(bool isAssignExp){
 static void string(bool isAssignExp){
 
     Token strToken=parser.previous;
-    Value value;
+    //Value value;
 
     size_t stringLiteralIndex=internString(&strings, strToken, src);
 
@@ -227,11 +225,14 @@ static void identifier(bool isAssignExp){
       expression();
       //TODO: Handle long indexes
       WRITE_BYTECODE(chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
-      WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
+      WRITE_BYTECODE(chunk, BsobjStringConstIndex, identifierToken.line);
       return;
   }
   WRITE_BYTECODE(chunk, OP_GLOBALVAR_GET, identifierToken.line);
-  WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
+  WRITE_BYTECODE(chunk, BsobjStringConstIndex, identifierToken.line);
+  //cache hash index
+  WRITE_BYTECODE(chunk, 0, identifierToken.line);
+  WRITE_BYTECODE(chunk, 0, identifierToken.line);
 }
 static void nil(bool isAssignExp){
     Token nilToken=parser.previous;

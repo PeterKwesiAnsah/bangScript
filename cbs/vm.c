@@ -5,6 +5,7 @@
 #include "stack.h"
 #include "table.h"
 #include <assert.h>
+#include <cstdint>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -252,12 +253,26 @@ ProgramStatus run(){
                 break;
             case OP_GLOBALVAR_GET:
             {
+                uint8_t *cacheHashIndexIp=ip+1;
                 uint8_t varConstIndex = READ_BYTE_CODE(ip);
+
                 Value var= constants.arr[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value value;
-                //TODO: check for undefined vars
-                if(Tget(&globals, (BsObjString *)var.value.obj, &value)){
+                uint16_t cacheHashIndex=0;
+
+                cacheHashIndex = cacheHashIndex | (uint8_t)READ_BYTE_CODE(ip);
+                cacheHashIndex = cacheHashIndex << 8;
+                cacheHashIndex = cacheHashIndex | (uint8_t)READ_BYTE_CODE(ip);
+
+                if(globals.len && cacheHashIndex < globals.cap && globals.arr[cacheHashIndex].key==(BsObjString *)((BsObjStringFromSource *)var.value.obj)->value){
+                    push(globals.arr[cacheHashIndex].value);
+                    break;
+                }
+
+                if(Tget(&globals, (BsObjString *)var.value.obj, &value, (uint32_t *)&cacheHashIndex)){
+                    *cacheHashIndexIp++=(cacheHashIndex >> 8) & 0xFF;
+                    *cacheHashIndexIp=cacheHashIndex & 0xFF;
                     push(value);
                     break;
                 };
@@ -265,7 +280,6 @@ ProgramStatus run(){
                     ((BsObjStringFromSource *)var.value.obj)->len,
                     ((BsObjStringFromSource *)var.value.obj)->value);
                 return ERROR;
-
             }
                 break;
             //TODO: OP_GLOBALVAR_LONG_ASSIGN
