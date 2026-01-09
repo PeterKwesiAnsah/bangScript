@@ -5,7 +5,6 @@
 #include "stack.h"
 #include "table.h"
 #include <assert.h>
-#include <cstdint>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -55,6 +54,11 @@ ProgramStatus run(){
                 index= index | ((unsigned int)highByte << 16);
                 Value value= constants.arr[index];
                 push(value);
+            }
+            break;
+            case OP_POP:
+            {
+                pop();
             }
             break;
             case OP_ADD:{
