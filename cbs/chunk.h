@@ -21,16 +21,30 @@ typedef enum {
     OP_GLOBALVAR_DEF,
     OP_GLOBALVAR_GET,
     OP_GLOBALVAR_ASSIGN,
+    OP_POP,
     //for debugging purposes
     OP_PRINT,
     OP_RETURN
 } BS_OP_CODES;
 
-DECLARE_ARRAY_TYPE(u_int8_t, Chunk);
+#define DECLARE_CHUNK_TYPE(name) \
+typedef struct {   \
+    size_t cap;\
+    size_t len;\
+    u_int8_t *arr;\
+    uint8_t *ip;\
+} name;
+
+DECLARE_CHUNK_TYPE(Chunk)
+
+#define DECLARE_CHUNK(name) \
+    DECLARE_ARRAY(u_int8_t, name); \
+    uint8_t *ip;
 
 #define WRITE_BYTECODE(chunk,byte,line) do{ \
 append(chunk,u_int8_t,byte);\
-addLine(line);\
 }while(0)
+
+
 
 #endif
