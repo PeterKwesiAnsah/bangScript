@@ -5,13 +5,30 @@
 #include <stdbool.h>
 #include "scanner.h"
 #include "table.h"
+#include <stdint.h>
+
+#define IN_SCOPE_LOCALS_LIMIT (UINT8_MAX+1)
 
 
 extern Parser parser;
 extern Table strings;
 extern Chunk chunk;
 
+
 extern inline size_t internString(Table *, Token , const char *);
+
+typedef struct {
+    Token name;
+    unsigned depth;
+} Local;
+
+typedef struct {
+    Local locals[IN_SCOPE_LOCALS_LIMIT];
+    unsigned len;
+    unsigned scopeDepth;
+} Compiler;
+
+Compiler current;
 
 CompilerStatus compile(const char *src){
 
@@ -30,11 +47,17 @@ CompilerStatus compile(const char *src){
             {
                 advance();
                 Token cur=parser.current;
+                if(current.scopeDepth>0){
+                    //define local variable as it is in scope
+                    current.locals[current.len].name=cur;
+                    current.locals[current.len].depth=-1;
+                }
                 //if(cur.tt!=TOKEN_IDENTIFIER){
                     //compile error
                 //}
                 advance();
                 //var foo=0;
+                // Handle multiple global var definations
                 if(parser.current.tt==TOKEN_EQUAL){
                     advance();
                     expression();
@@ -45,14 +68,19 @@ CompilerStatus compile(const char *src){
                         parser.hadError=true;
                         return true;
                     }
-                    WRITE_BYTECODE(chunk, OP_CONSTANT, 0);
-                    WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX, 0);
+                    WRITE_BYTECODE(chunk, OP_CONSTANT, cur.line);
+                    WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX, cur.line);
                     advance();
                 }
 
+                if(current.scopeDepth>0){
+                    current.locals[current.len++].depth=current.scopeDepth;
+                    break;
+                }
+                //if local var, we skip this???
                 size_t BsobjStringConstIndex=internString(&strings, cur, src);
                 WRITE_BYTECODE(chunk, OP_GLOBALVAR_DEF, cur.line);
-                WRITE_BYTECODE(chunk, BsobjStringConstIndex, 0);
+                WRITE_BYTECODE(chunk, BsobjStringConstIndex, cur.line);
             }
             break;
             case TOKEN_PRINT:{
@@ -63,7 +91,7 @@ CompilerStatus compile(const char *src){
             }
             break;
             case TOKEN_EOF:{
-                WRITE_BYTECODE(chunk, OP_RETURN, 0);
+                WRITE_BYTECODE(chunk, OP_RETURN, parser.current.line);
               return !parser.hadError;
             }
             default:
@@ -71,8 +99,5 @@ CompilerStatus compile(const char *src){
             break;
         }
     }
-
-
-
     return !parser.hadError;
 }
