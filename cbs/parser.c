@@ -1,242 +1,278 @@
 #include "parser.h"
 #include "chunk.h"
+#include "compiler.h"
 #include "darray.h"
+#include "readonly.h"
 #include "scanner.h"
+#include "table.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "readonly.h"
-#include "table.h"
+#include <string.h>
 
-
-
-
-
-Parser parser={{},{},false};
+Parser parser = {{}, {}, false};
 
 extern const char *src;
 extern const char *scanerr;
-//table of a set of unique(textually) BsObjString
+// table of a set of unique(textually) BsObjString
 extern Table strings;
 extern DECLARE_ARRAY(u_int8_t, chunk);
 
-extern inline size_t internString(Table *, Token , const char *);
+extern Compiler current;
+
+extern inline size_t internString(Table *, Token, const char *);
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
-    [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_MINUS]         = {unary,    binary, PREC_TERM},
-    [TOKEN_PLUS]          = {NULL,     binary, PREC_TERM},
-    [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
-    [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
-    [TOKEN_BANG]          = {unary,    NULL,  PREC_NONE},
-    [TOKEN_BANG_EQUAL]    = {NULL,     binary, PREC_EQUALITY},
-    [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQUAL_EQUAL]   = {NULL,     binary, PREC_EQUALITY},
-    [TOKEN_GREATER]       = {NULL,     binary, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL] = {NULL,     binary,   PREC_COMPARISON},
-    [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
-    [TOKEN_IDENTIFIER]    = {identifier,     NULL,   PREC_PRIMARY},
-    [TOKEN_STRING]        = {string,   NULL, PREC_NONE},
-    [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
-    [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_TRUE]          = {boolean,  NULL,   PREC_NONE},
-    [TOKEN_FALSE]         = {boolean,  NULL,   PREC_NONE},
-    [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_NIL]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
+    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
+    [TOKEN_DOT] = {NULL, NULL, PREC_NONE},
+    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
+    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
+    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_BANG] = {unary, NULL, PREC_NONE},
+    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
+    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_PRIMARY},
+    [TOKEN_STRING] = {string, NULL, PREC_NONE},
+    [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_AND] = {NULL, NULL, PREC_NONE},
+    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
+    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_TRUE] = {boolean, NULL, PREC_NONE},
+    [TOKEN_FALSE] = {boolean, NULL, PREC_NONE},
+    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
+    [TOKEN_IF] = {NULL, NULL, PREC_NONE},
+    [TOKEN_NIL] = {NULL, NULL, PREC_NONE},
+    [TOKEN_OR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
+    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
+    [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
+    [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
 };
 
-
-
-void advance(){
-    parser.previous=parser.current;
-    for(;;){
-        parser.current=scanTokens(src);
-        if(parser.current.tt!=TOKEN_ERROR) break;
-        fprintf(stderr, "%s at line %d", scanerr,parser.current.line);
-        parser.hadError=true;
-    }
+void advance() {
+  parser.previous = parser.current;
+  for (;;) {
+    parser.current = scanTokens(src);
+    if (parser.current.tt != TOKEN_ERROR)
+      break;
+    fprintf(stderr, "%s at line %d", scanerr, parser.current.line);
+    parser.hadError = true;
+  }
 }
 static void parsePrecedence(Precedence precedence) {
-    advance();
-    ParseFn prefixRule = rules[parser.previous.tt].prefix;
-    if (prefixRule == NULL) {
-        fputs("Invalid Expression",stderr);
-        parser.hadError=true;
-        return;
-    }
-    prefixRule(precedence==PREC_ASSIGNMENT);
+  advance();
+  ParseFn prefixRule = rules[parser.previous.tt].prefix;
+  if (prefixRule == NULL) {
+    fputs("Invalid Expression", stderr);
+    parser.hadError = true;
+    return;
+  }
+  prefixRule(precedence == PREC_ASSIGNMENT);
 
-while (precedence <= rules[parser.current.tt].precedence) {
+  while (precedence <= rules[parser.current.tt].precedence) {
     advance();
     ParseFn infixRule = rules[parser.previous.tt].infix;
-    infixRule(precedence==PREC_ASSIGNMENT);
-    }
+    infixRule(precedence == PREC_ASSIGNMENT);
+  }
 }
 
-void expression(){
-    parsePrecedence(PREC_ASSIGNMENT);
-    if(parser.current.tt!=TOKEN_SEMICOLON){
-        fprintf(stderr,"Expected a semi-colon but got %d\n",parser.current.tt);
-        parser.hadError=true;
-        return;
-    }
-    advance();
+void expression() {
+  parsePrecedence(PREC_ASSIGNMENT);
+  if (parser.current.tt != TOKEN_SEMICOLON) {
+    fprintf(stderr, "Expected a semi-colon but got %d\n", parser.current.tt);
+    parser.hadError = true;
+    return;
+  }
+  advance();
 }
-void grouping(bool isAssignExp ){
-    parsePrecedence(PREC_ASSIGNMENT);
-    if(parser.current.tt!=TOKEN_RIGHT_PAREN){
-        fprintf(stderr,"Expected Right Paren but got %d\n",parser.current.tt);
-        parser.hadError=true;
-        return;
-    }
-    advance();
+void grouping(bool isAssignExp) {
+  parsePrecedence(PREC_ASSIGNMENT);
+  if (parser.current.tt != TOKEN_RIGHT_PAREN) {
+    fprintf(stderr, "Expected Right Paren but got %d\n", parser.current.tt);
+    parser.hadError = true;
+    return;
+  }
+  advance();
 }
 
 static void binary(bool isAssignExp) {
-    TokenType operatorType = parser.previous.tt;
-    unsigned int line=parser.previous.line;
-    parsePrecedence((Precedence)(rules[parser.previous.tt].precedence + 1));
-    switch (operatorType) {
-        case TOKEN_PLUS:
-            WRITE_BYTECODE(chunk, OP_ADD,line);
-            break;
-        case TOKEN_MINUS:
-          WRITE_BYTECODE(chunk, OP_SUB,line);
-            break;
-        case TOKEN_STAR:
-            WRITE_BYTECODE(chunk, OP_MUL,line);
-            break;
-        case TOKEN_SLASH:
-          WRITE_BYTECODE(chunk, OP_DIV,line);
-            break;
-        case TOKEN_EQUAL_EQUAL:
-            WRITE_BYTECODE(chunk, OP_EQUAL,line);
-            break;
-        case TOKEN_BANG_EQUAL:
-            WRITE_BYTECODE(chunk, OP_EQUAL_NOT,line);
-            break;
-        case TOKEN_GREATER:
-            WRITE_BYTECODE(chunk, OP_GREATOR,line);
-            break;
-        case TOKEN_GREATER_EQUAL:
-            WRITE_BYTECODE(chunk, OP_LESS_NOT,line);
-            break;
-        case TOKEN_LESS:
-            WRITE_BYTECODE(chunk, OP_LESS,line);
-            break;
-        case TOKEN_LESS_EQUAL:
-            WRITE_BYTECODE(chunk, OP_GREATOR_NOT,line);
-            break;
-        default:
-            return; // Unreachable.
+  TokenType operatorType = parser.previous.tt;
+  unsigned int line = parser.previous.line;
+  parsePrecedence((Precedence)(rules[parser.previous.tt].precedence + 1));
+  switch (operatorType) {
+  case TOKEN_PLUS:
+    WRITE_BYTECODE(chunk, OP_ADD, line);
+    break;
+  case TOKEN_MINUS:
+    WRITE_BYTECODE(chunk, OP_SUB, line);
+    break;
+  case TOKEN_STAR:
+    WRITE_BYTECODE(chunk, OP_MUL, line);
+    break;
+  case TOKEN_SLASH:
+    WRITE_BYTECODE(chunk, OP_DIV, line);
+    break;
+  case TOKEN_EQUAL_EQUAL:
+    WRITE_BYTECODE(chunk, OP_EQUAL, line);
+    break;
+  case TOKEN_BANG_EQUAL:
+    WRITE_BYTECODE(chunk, OP_EQUAL_NOT, line);
+    break;
+  case TOKEN_GREATER:
+    WRITE_BYTECODE(chunk, OP_GREATOR, line);
+    break;
+  case TOKEN_GREATER_EQUAL:
+    WRITE_BYTECODE(chunk, OP_LESS_NOT, line);
+    break;
+  case TOKEN_LESS:
+    WRITE_BYTECODE(chunk, OP_LESS, line);
+    break;
+  case TOKEN_LESS_EQUAL:
+    WRITE_BYTECODE(chunk, OP_GREATOR_NOT, line);
+    break;
+  default:
+    return; // Unreachable.
+  }
+}
+
+void unary(bool isAssignExp) {
+  Token token = parser.previous;
+
+  switch (token.tt) {
+  case TOKEN_MINUS: {
+    WRITE_BYTECODE(chunk, OP_CONSTANT_ZER0, token.line);
+    parsePrecedence(PREC_UNARY);
+    WRITE_BYTECODE(chunk, OP_SUB, token.line);
+  } break;
+  default:
+    return;
+  }
+}
+
+static void number(bool isAssignExp) {
+  Token numToken = parser.previous;
+  size_t constantIndex =
+      addConstant(C_DOUBLE_TO_BS_NUMBER(atof(src + numToken.start)));
+  if (constantIndex >= CONSTANT_LIMIT) {
+    // Write opcode
+    WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, numToken.line);
+    // Write operand as 3 bytes
+    WRITE_BYTECODE(chunk, constantIndex & 0xFF, numToken.line);
+    WRITE_BYTECODE(chunk, (constantIndex >> 8) & 0xFF, numToken.line);
+    WRITE_BYTECODE(chunk, (constantIndex >> 16) & 0xFF, numToken.line);
+    return;
+  }
+  // write opCode
+  WRITE_BYTECODE(chunk, OP_CONSTANT, numToken.line);
+  // write operand Index
+  WRITE_BYTECODE(chunk, constantIndex, numToken.line);
+}
+static void string(bool isAssignExp) {
+
+  Token strToken = parser.previous;
+  // Value value;
+
+  size_t stringLiteralIndex = internString(&strings, strToken, src);
+
+  if (stringLiteralIndex >= CONSTANT_LIMIT) {
+    // Write opcode
+    WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, strToken.line);
+    // Write operand as 3 bytes
+    WRITE_BYTECODE(chunk, stringLiteralIndex & 0xFF, strToken.line);
+    WRITE_BYTECODE(chunk, (stringLiteralIndex >> 8) & 0xFF, strToken.line);
+    WRITE_BYTECODE(chunk, (stringLiteralIndex >> 16) & 0xFF, strToken.line);
+    return;
+  }
+
+  // write opCode
+  WRITE_BYTECODE(chunk, OP_CONSTANT, strToken.line);
+  // write operand Index
+  WRITE_BYTECODE(chunk, stringLiteralIndex, strToken.line);
+}
+
+static void boolean(bool isAssignExp) {
+  Token boolToken = parser.previous;
+  // write opCode
+  WRITE_BYTECODE(chunk, OP_CONSTANT, boolToken.line);
+  // write operand Index
+  WRITE_BYTECODE(chunk,
+                 (boolToken.tt == TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX
+                                             : CONSTANT_FALSE_BOOL_INDEX),
+                 boolToken.line);
+}
+
+static void identifier(bool isAssignExp) {
+  Token identifierToken = parser.previous;
+  bool assignment = isAssignExp && parser.current.tt == TOKEN_EQUAL;
+
+  uint8_t OP_CODE_GET = 0;
+  uint8_t OP_CODE_SET = 0;
+
+  int OP_CODE_OPERAND_INDEX = current.len;
+
+  if (current.scopeDepth == 0)
+    goto ParseCompileGlobals;
+
+  for (; OP_CODE_OPERAND_INDEX >= 0; OP_CODE_OPERAND_INDEX--) {
+    if (identifierToken.len == current.locals[OP_CODE_OPERAND_INDEX].name.len &&
+        current.locals[OP_CODE_OPERAND_INDEX].depth != -1 &&
+        !memcmp(src + identifierToken.start, src + current.locals[OP_CODE_OPERAND_INDEX].name.start,
+                identifierToken.len)) {
+      break;
     }
-}
+  }
 
-
-
-
-void unary (bool isAssignExp){
-    Token token=parser.previous;
-
-    switch (token.tt) {
-        case TOKEN_MINUS:
-        {
-            WRITE_BYTECODE(chunk, OP_CONSTANT_ZER0,token.line );
-            parsePrecedence(PREC_UNARY);
-            WRITE_BYTECODE(chunk, OP_SUB,token.line);
-        }
-        break;
-        default:
-            return;
-    }
-}
-
-static void number(bool isAssignExp){
-    Token numToken=parser.previous;
-    size_t constantIndex=addConstant(C_DOUBLE_TO_BS_NUMBER(atof(src+numToken.start)));
-    if(constantIndex >= CONSTANT_LIMIT){
-        // Write opcode
-        WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, numToken.line);
-        // Write operand as 3 bytes
-        WRITE_BYTECODE(chunk, constantIndex & 0xFF, numToken.line);
-        WRITE_BYTECODE(chunk, (constantIndex >> 8) & 0xFF, numToken.line);
-        WRITE_BYTECODE(chunk, (constantIndex >> 16) & 0xFF, numToken.line);
-        return;
-    }
-    //write opCode
-    WRITE_BYTECODE(chunk, OP_CONSTANT, numToken.line);
-    //write operand Index
-    WRITE_BYTECODE(chunk, constantIndex, numToken.line);
-}
-static void string(bool isAssignExp){
-
-    Token strToken=parser.previous;
-    //Value value;
-
-    size_t stringLiteralIndex=internString(&strings, strToken, src);
-
-    if(stringLiteralIndex >= CONSTANT_LIMIT){
-        // Write opcode
-        WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, strToken.line);
-        // Write operand as 3 bytes
-        WRITE_BYTECODE(chunk, stringLiteralIndex & 0xFF, strToken.line);
-        WRITE_BYTECODE(chunk, (stringLiteralIndex >> 8) & 0xFF, strToken.line);
-        WRITE_BYTECODE(chunk, (stringLiteralIndex >> 16) & 0xFF, strToken.line);
-        return;
-    }
-
-    //write opCode
-    WRITE_BYTECODE(chunk, OP_CONSTANT, strToken.line);
-    //write operand Index
-    WRITE_BYTECODE(chunk, stringLiteralIndex, strToken.line);
-}
-
-static void boolean(bool isAssignExp){
-    Token boolToken=parser.previous;
-    //write opCode
-    WRITE_BYTECODE(chunk, OP_CONSTANT, boolToken.line);
-    //write operand Index
-    WRITE_BYTECODE(chunk, (boolToken.tt==TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX:CONSTANT_FALSE_BOOL_INDEX),boolToken.line);
-}
-
-static void identifier(bool isAssignExp){
-  Token identifierToken=parser.previous;
-
-  size_t BsobjStringConstIndex=internString(&strings, identifierToken, src);
-  if(isAssignExp && parser.current.tt==TOKEN_EQUAL){
+  if (OP_CODE_OPERAND_INDEX == -1) {
+  ParseCompileGlobals:
+    OP_CODE_OPERAND_INDEX = internString(&strings, identifierToken, src);
+    if (assignment) {
       advance();
       expression();
-      //TODO: Handle long indexes
+      // TODO: Handle long indexes
       WRITE_BYTECODE(chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
-      WRITE_BYTECODE(chunk, BsobjStringConstIndex, identifierToken.line);
+      WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+    }else {
+        WRITE_BYTECODE(chunk, OP_GLOBALVAR_GET, identifierToken.line);
+        WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+        // cache hash index
+        WRITE_BYTECODE(chunk, 0, identifierToken.line);
+        WRITE_BYTECODE(chunk, 0, identifierToken.line);
+    }
       return;
+  } else {
+    if (assignment) {
+      const unsigned localDepth = current.locals[OP_CODE_OPERAND_INDEX].depth;
+      current.locals[OP_CODE_OPERAND_INDEX].depth = -1;
+      advance();
+      expression();
+      current.locals[OP_CODE_OPERAND_INDEX].depth = localDepth;
+      // TODO: Handle long indexes
+      WRITE_BYTECODE(chunk, OP_LOCALVAR_ASSIGN, identifierToken.line);
+      WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+    } else {
+        WRITE_BYTECODE(chunk, OP_LOCALVAR_GET, identifierToken.line);
+        WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+    }
   }
-  WRITE_BYTECODE(chunk, OP_GLOBALVAR_GET, identifierToken.line);
-  WRITE_BYTECODE(chunk, BsobjStringConstIndex, identifierToken.line);
-  //cache hash index
-  WRITE_BYTECODE(chunk, 0, identifierToken.line);
-  WRITE_BYTECODE(chunk, 0, identifierToken.line);
 }
-static void nil(bool isAssignExp){
-    Token nilToken=parser.previous;
-    WRITE_BYTECODE(chunk, OP_CONSTANT, nilToken.line);
-    //write operand Index
-    WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX,nilToken.line);
+
+static void nil(bool isAssignExp) {
+  Token nilToken = parser.previous;
+  WRITE_BYTECODE(chunk, OP_CONSTANT, nilToken.line);
+  // write operand Index
+  WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX, nilToken.line);
 }
