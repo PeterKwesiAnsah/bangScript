@@ -6,7 +6,7 @@ struct {
     unsigned int line;
     size_t start;
     signed long cur;
-} state={0,0,0};
+} state={1,0,0};
 
 const char *scanerr;
 
@@ -61,6 +61,11 @@ Token scanTokens(const char *src){
                 state.cur++;
                 while ((c=src[state.cur],c!='\n' && !isEOF(c))){
                     state.cur++;
+                }
+                // consume the newline if present
+                if (c == '\n') {
+                    state.cur++;
+                    state.line++;
                 }
                return scanTokens(src);
             }
