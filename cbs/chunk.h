@@ -21,6 +21,8 @@ typedef enum {
     OP_GLOBALVAR_DEF,
     OP_GLOBALVAR_GET,
     OP_GLOBALVAR_ASSIGN,
+    OP_LOCALVAR_GET,
+    OP_LOCAVAR_ASSIGN,
     OP_POP,
     //for debugging purposes
     OP_PRINT,
