@@ -136,7 +136,7 @@ bool Tsets(Table *Tinstance,BsObjString *key, Value value){
 }
 
 //true if entry was  found, false otherwise
-bool Tget(Table *Tinstance,BsObjString *key, Value *value){
+bool Tget(Table *Tinstance,BsObjString *key, Value *value, u_int32_t *foundIndex){
     size_t cap=Tinstance->cap;
     u_int32_t index=key->hash % cap;
     Tnode *node=&Tinstance->arr[index];
@@ -151,6 +151,7 @@ bool Tget(Table *Tinstance,BsObjString *key, Value *value){
     }
 
     *value=node->value;
+    *foundIndex=index;
     return true;
 }
 

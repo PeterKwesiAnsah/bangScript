@@ -3,6 +3,7 @@
 
 #include "readonly.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 #define LOAD_FACTOR_MAX 0.75
 #define LOAD_FACTOR_MIN 0.1
@@ -35,7 +36,7 @@ void Tcopy(const Table *,Table *);
 
 
 bool Tset(Table *,BsObjString *, Value);
-bool Tget(Table *,BsObjString *, Value *);
+bool Tget(Table *,BsObjString *, Value *, uint32_t *);
 bool Tdelete(Table *,BsObjString *);
 
 BsObjString *Tgets(Table *,BsObjString *,Value *);
