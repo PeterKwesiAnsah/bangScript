@@ -103,7 +103,6 @@ CompilerStatus compile(const char *src) {
 
   // set the ball rolling
   advance();
-  while (!declaration(src) && parser.current.tt != TOKEN_EOF) {
-  }
+  while (!declaration(src) && parser.current.tt != TOKEN_EOF);
   return !parser.hadError;
 }
