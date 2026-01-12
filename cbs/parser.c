@@ -5,6 +5,7 @@
 #include "readonly.h"
 #include "scanner.h"
 #include "table.h"
+#include "vm.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -14,13 +15,11 @@
 
 Parser parser = {{}, {}, false};
 
-extern const char *src;
 extern const char *scanerr;
 // table of a set of unique(textually) BsObjString
 extern Table strings;
-extern DECLARE_ARRAY(u_int8_t, chunk);
 
-extern Compiler current;
+extern Compiler *current;
 
 extern inline size_t internString(Table *, Token, const char *);
 
@@ -66,7 +65,7 @@ ParseRule rules[] = {
 void advance() {
   parser.previous = parser.current;
   for (;;) {
-    parser.current = scanTokens(src);
+    parser.current = scanTokens(frame.src);
     if (parser.current.tt != TOKEN_ERROR)
       break;
     fprintf(stderr, "%s at line %d", scanerr, parser.current.line);
@@ -115,34 +114,34 @@ static void binary(bool isAssignExp) {
   parsePrecedence((Precedence)(rules[parser.previous.tt].precedence + 1));
   switch (operatorType) {
   case TOKEN_PLUS:
-    WRITE_BYTECODE(chunk, OP_ADD, line);
+    WRITE_BYTECODE(frame.chunk, OP_ADD, line);
     break;
   case TOKEN_MINUS:
-    WRITE_BYTECODE(chunk, OP_SUB, line);
+    WRITE_BYTECODE(frame.chunk, OP_SUB, line);
     break;
   case TOKEN_STAR:
-    WRITE_BYTECODE(chunk, OP_MUL, line);
+    WRITE_BYTECODE(frame.chunk, OP_MUL, line);
     break;
   case TOKEN_SLASH:
-    WRITE_BYTECODE(chunk, OP_DIV, line);
+    WRITE_BYTECODE(frame.chunk, OP_DIV, line);
     break;
   case TOKEN_EQUAL_EQUAL:
-    WRITE_BYTECODE(chunk, OP_EQUAL, line);
+    WRITE_BYTECODE(frame.chunk, OP_EQUAL, line);
     break;
   case TOKEN_BANG_EQUAL:
-    WRITE_BYTECODE(chunk, OP_EQUAL_NOT, line);
+    WRITE_BYTECODE(frame.chunk, OP_EQUAL_NOT, line);
     break;
   case TOKEN_GREATER:
-    WRITE_BYTECODE(chunk, OP_GREATOR, line);
+    WRITE_BYTECODE(frame.chunk, OP_GREATOR, line);
     break;
   case TOKEN_GREATER_EQUAL:
-    WRITE_BYTECODE(chunk, OP_LESS_NOT, line);
+    WRITE_BYTECODE(frame.chunk, OP_LESS_NOT, line);
     break;
   case TOKEN_LESS:
-    WRITE_BYTECODE(chunk, OP_LESS, line);
+    WRITE_BYTECODE(frame.chunk, OP_LESS, line);
     break;
   case TOKEN_LESS_EQUAL:
-    WRITE_BYTECODE(chunk, OP_GREATOR_NOT, line);
+    WRITE_BYTECODE(frame.chunk, OP_GREATOR_NOT, line);
     break;
   default:
     return; // Unreachable.
@@ -154,9 +153,9 @@ void unary(bool isAssignExp) {
 
   switch (token.tt) {
   case TOKEN_MINUS: {
-    WRITE_BYTECODE(chunk, OP_CONSTANT_ZER0, token.line);
+    WRITE_BYTECODE(frame.chunk, OP_CONSTANT_ZER0, token.line);
     parsePrecedence(PREC_UNARY);
-    WRITE_BYTECODE(chunk, OP_SUB, token.line);
+    WRITE_BYTECODE(frame.chunk, OP_SUB, token.line);
   } break;
   default:
     return;
@@ -166,50 +165,50 @@ void unary(bool isAssignExp) {
 static void number(bool isAssignExp) {
   Token numToken = parser.previous;
   size_t constantIndex =
-      addConstant(C_DOUBLE_TO_BS_NUMBER(atof(src + numToken.start)));
+      addConstant(C_DOUBLE_TO_BS_NUMBER(atof(frame.src + numToken.start)));
   if (constantIndex >= CONSTANT_LIMIT) {
     // Write opcode
-    WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, numToken.line);
+    WRITE_BYTECODE(frame.chunk, OP_CONSTANT_LONG, numToken.line);
     // Write operand as 3 bytes
-    WRITE_BYTECODE(chunk, constantIndex & 0xFF, numToken.line);
-    WRITE_BYTECODE(chunk, (constantIndex >> 8) & 0xFF, numToken.line);
-    WRITE_BYTECODE(chunk, (constantIndex >> 16) & 0xFF, numToken.line);
+    WRITE_BYTECODE(frame.chunk, constantIndex & 0xFF, numToken.line);
+    WRITE_BYTECODE(frame.chunk, (constantIndex >> 8) & 0xFF, numToken.line);
+    WRITE_BYTECODE(frame.chunk, (constantIndex >> 16) & 0xFF, numToken.line);
     return;
   }
   // write opCode
-  WRITE_BYTECODE(chunk, OP_CONSTANT, numToken.line);
+  WRITE_BYTECODE(frame.chunk, OP_CONSTANT, numToken.line);
   // write operand Index
-  WRITE_BYTECODE(chunk, constantIndex, numToken.line);
+  WRITE_BYTECODE(frame.chunk, constantIndex, numToken.line);
 }
 static void string(bool isAssignExp) {
 
   Token strToken = parser.previous;
   // Value value;
 
-  size_t stringLiteralIndex = internString(&strings, strToken, src);
+  size_t stringLiteralIndex = internString(&strings, strToken, frame.src);
 
   if (stringLiteralIndex >= CONSTANT_LIMIT) {
     // Write opcode
-    WRITE_BYTECODE(chunk, OP_CONSTANT_LONG, strToken.line);
+    WRITE_BYTECODE(frame.chunk, OP_CONSTANT_LONG, strToken.line);
     // Write operand as 3 bytes
-    WRITE_BYTECODE(chunk, stringLiteralIndex & 0xFF, strToken.line);
-    WRITE_BYTECODE(chunk, (stringLiteralIndex >> 8) & 0xFF, strToken.line);
-    WRITE_BYTECODE(chunk, (stringLiteralIndex >> 16) & 0xFF, strToken.line);
+    WRITE_BYTECODE(frame.chunk, stringLiteralIndex & 0xFF, strToken.line);
+    WRITE_BYTECODE(frame.chunk, (stringLiteralIndex >> 8) & 0xFF, strToken.line);
+    WRITE_BYTECODE(frame.chunk, (stringLiteralIndex >> 16) & 0xFF, strToken.line);
     return;
   }
 
   // write opCode
-  WRITE_BYTECODE(chunk, OP_CONSTANT, strToken.line);
+  WRITE_BYTECODE(frame.chunk, OP_CONSTANT, strToken.line);
   // write operand Index
-  WRITE_BYTECODE(chunk, stringLiteralIndex, strToken.line);
+  WRITE_BYTECODE(frame.chunk, stringLiteralIndex, strToken.line);
 }
 
 static void boolean(bool isAssignExp) {
   Token boolToken = parser.previous;
   // write opCode
-  WRITE_BYTECODE(chunk, OP_CONSTANT, boolToken.line);
+  WRITE_BYTECODE(frame.chunk, OP_CONSTANT, boolToken.line);
   // write operand Index
-  WRITE_BYTECODE(chunk,
+  WRITE_BYTECODE(frame.chunk,
                  (boolToken.tt == TOKEN_TRUE ? CONSTANT_TRUE_BOOL_INDEX
                                              : CONSTANT_FALSE_BOOL_INDEX),
                  boolToken.line);
@@ -222,15 +221,15 @@ static void identifier(bool isAssignExp) {
   uint8_t OP_CODE_GET = 0;
   uint8_t OP_CODE_SET = 0;
 
-  int OP_CODE_OPERAND_INDEX = current.len;
+  int OP_CODE_OPERAND_INDEX = current->len;
 
-  if (current.scopeDepth == 0)
+  if (current->scopeDepth == 0)
     goto ParseCompileGlobals;
 
   for (; OP_CODE_OPERAND_INDEX >= 0; OP_CODE_OPERAND_INDEX--) {
-    if (identifierToken.len == current.locals[OP_CODE_OPERAND_INDEX].name.len &&
-        current.locals[OP_CODE_OPERAND_INDEX].depth != -1 &&
-        !memcmp(src + identifierToken.start, src + current.locals[OP_CODE_OPERAND_INDEX].name.start,
+    if (identifierToken.len == current->locals[OP_CODE_OPERAND_INDEX].name.len &&
+        current->locals[OP_CODE_OPERAND_INDEX].depth != -1 &&
+        !memcmp(frame.src + identifierToken.start, frame.src + current->locals[OP_CODE_OPERAND_INDEX].name.start,
                 identifierToken.len)) {
       break;
     }
@@ -238,41 +237,41 @@ static void identifier(bool isAssignExp) {
 
   if (OP_CODE_OPERAND_INDEX == -1) {
   ParseCompileGlobals:
-    OP_CODE_OPERAND_INDEX = internString(&strings, identifierToken, src);
+    OP_CODE_OPERAND_INDEX = internString(&strings, identifierToken, frame.src);
     if (assignment) {
       advance();
       expression();
       // TODO: Handle long indexes
-      WRITE_BYTECODE(chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
-      WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
     }else {
-        WRITE_BYTECODE(chunk, OP_GLOBALVAR_GET, identifierToken.line);
-        WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+        WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_GET, identifierToken.line);
+        WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
         // cache hash index
-        WRITE_BYTECODE(chunk, 0, identifierToken.line);
-        WRITE_BYTECODE(chunk, 0, identifierToken.line);
+        WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
+        WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
     }
       return;
   } else {
     if (assignment) {
-      const unsigned localDepth = current.locals[OP_CODE_OPERAND_INDEX].depth;
-      current.locals[OP_CODE_OPERAND_INDEX].depth = -1;
+      const unsigned localDepth = current->locals[OP_CODE_OPERAND_INDEX].depth;
+      current->locals[OP_CODE_OPERAND_INDEX].depth = -1;
       advance();
       expression();
-      current.locals[OP_CODE_OPERAND_INDEX].depth = localDepth;
+      current->locals[OP_CODE_OPERAND_INDEX].depth = localDepth;
       // TODO: Handle long indexes
-      WRITE_BYTECODE(chunk, OP_LOCALVAR_ASSIGN, identifierToken.line);
-      WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, OP_LOCALVAR_ASSIGN, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
     } else {
-        WRITE_BYTECODE(chunk, OP_LOCALVAR_GET, identifierToken.line);
-        WRITE_BYTECODE(chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+        WRITE_BYTECODE(frame.chunk, OP_LOCALVAR_GET, identifierToken.line);
+        WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
     }
   }
 }
 
 static void nil(bool isAssignExp) {
   Token nilToken = parser.previous;
-  WRITE_BYTECODE(chunk, OP_CONSTANT, nilToken.line);
+  WRITE_BYTECODE(frame.chunk, OP_CONSTANT, nilToken.line);
   // write operand Index
-  WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX, nilToken.line);
+  WRITE_BYTECODE(frame.chunk, CONSTANT_NIL_INDEX, nilToken.line);
 }

@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#define READ_BYTE_CODE(currentInsPointer) (*currentInsPointer++)
+#define READ_BYTE_CODE() (*frame.ip++)
 #define EVALUATE_BIN_EXP(operator) do {\
     Value b=pop();\
     Value a=pop();\
@@ -18,41 +18,38 @@
 
 
 
-extern DECLARE_ARRAY(Value, constants);
-extern DECLARE_ARRAY(u_int8_t, chunk);
+
 
 Table globals={};
 
-uint8_t *ip=NULL;
-
 ProgramStatus run(){
     Tinit(&globals);
-    ip=chunk.arr;
+    frame.ip=frame.chunk.arr;
     for(;;){
-        switch(READ_BYTE_CODE(ip)){
+        switch(READ_BYTE_CODE()){
             case OP_CONSTANT_ZER0:
             {
-                Value value= constants.arr[CONSTANT_ZERO_INDEX];
+                Value value= frame.constants[CONSTANT_ZERO_INDEX];
                 push(value);
             }
             break;
             case OP_CONSTANT:
             {
-                uint8_t index = READ_BYTE_CODE(ip);
-                Value value= constants.arr[index];
+                uint8_t index = READ_BYTE_CODE();
+                Value value= frame.constants[index];
                 push(value);
             }
             break;
             case OP_CONSTANT_LONG:
             {
                 unsigned int index =0;
-                uint8_t highByte=READ_BYTE_CODE(ip);
-                uint8_t midByte=READ_BYTE_CODE(ip);
-                uint8_t lowByte=READ_BYTE_CODE(ip);
+                uint8_t highByte=READ_BYTE_CODE();
+                uint8_t midByte=READ_BYTE_CODE();
+                uint8_t lowByte=READ_BYTE_CODE();
                 index= index | lowByte;
                 index= index | ((unsigned int)midByte << 8);
                 index= index | ((unsigned int)highByte << 16);
-                Value value= constants.arr[index];
+                Value value= frame.constants[index];
                 push(value);
             }
             break;
@@ -248,8 +245,8 @@ ProgramStatus run(){
             break;
             //TODO: OP_GLOBALVAR_LONG_DEF
             case OP_GLOBALVAR_DEF:{
-                uint8_t varConstIndex = READ_BYTE_CODE(ip);
-                Value var= constants.arr[varConstIndex];
+                uint8_t varConstIndex = READ_BYTE_CODE();
+                Value var= frame.constants[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value evalrhs=pop();
                 Tset(&globals, (BsObjString *)var.value.obj, evalrhs);
@@ -257,17 +254,17 @@ ProgramStatus run(){
                 break;
             case OP_GLOBALVAR_GET:
             {
-                uint8_t *cacheHashIndexIp=ip+1;
-                uint8_t varConstIndex = READ_BYTE_CODE(ip);
+                uint8_t *cacheHashIndexIp=frame.ip+1;
+                uint8_t varConstIndex = READ_BYTE_CODE();
 
-                Value var= constants.arr[varConstIndex];
+                Value var= frame.constants[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value value;
                 uint16_t cacheHashIndex=0;
 
-                cacheHashIndex = cacheHashIndex | (uint8_t)READ_BYTE_CODE(ip);
+                cacheHashIndex = cacheHashIndex | (uint8_t)READ_BYTE_CODE();
                 cacheHashIndex = cacheHashIndex << 8;
-                cacheHashIndex = cacheHashIndex | (uint8_t)READ_BYTE_CODE(ip);
+                cacheHashIndex = cacheHashIndex | (uint8_t)READ_BYTE_CODE();
 
                 if(globals.len && cacheHashIndex < globals.cap && globals.arr[cacheHashIndex].key==(BsObjString *)((BsObjStringFromSource *)var.value.obj)->value){
                     push(globals.arr[cacheHashIndex].value);
@@ -289,8 +286,8 @@ ProgramStatus run(){
             //TODO: OP_GLOBALVAR_LONG_ASSIGN
             case OP_GLOBALVAR_ASSIGN:
             {
-                uint8_t varConstIndex = READ_BYTE_CODE(ip);
-                Value var= constants.arr[varConstIndex];
+                uint8_t varConstIndex = READ_BYTE_CODE();
+                Value var= frame.constants[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value evalrhs=pop();
                 //TODO: check for undefined vars

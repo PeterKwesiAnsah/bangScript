@@ -4,7 +4,7 @@
 
 
 
-DECLARE_ARRAY(Value, constants)={};
+ValueArray constants={};
 Table strings={};
 
 

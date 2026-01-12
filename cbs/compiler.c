@@ -2,18 +2,18 @@
 #include "parser.h"
 #include "readonly.h"
 #include "table.h"
+#include "vm.h"
 #include <stdbool.h>
 
 
 extern Parser parser;
 extern Table strings;
-extern Chunk chunk;
+
 
 extern inline size_t internString(Table *, Token, const char *);
 
 
-
-Compiler current;
+extern Frame frame;
 
 // parse,complile statements
 CompilerStatus declaration(const char *src) {
@@ -22,10 +22,10 @@ CompilerStatus declaration(const char *src) {
   case TOKEN_VAR: {
     advance();
     Token cur = parser.current;
-    if (current.scopeDepth > 0) {
+    if (frame.compiler->scopeDepth > 0) {
       // define local variable as it is in scope
-      current.locals[current.len].name = cur;
-      current.locals[current.len].depth = -1;
+      frame.compiler->locals[frame.compiler->len].name = cur;
+      frame.compiler->locals[frame.compiler->len].depth = -1;
     }
     // if(cur.tt!=TOKEN_IDENTIFIER){
     // compile error
@@ -44,28 +44,28 @@ CompilerStatus declaration(const char *src) {
         parser.hadError = true;
         return true;
       }
-      WRITE_BYTECODE(chunk, OP_CONSTANT, cur.line);
-      WRITE_BYTECODE(chunk, CONSTANT_NIL_INDEX, cur.line);
+      WRITE_BYTECODE(frame.chunk, OP_CONSTANT, cur.line);
+      WRITE_BYTECODE(frame.chunk, CONSTANT_NIL_INDEX, cur.line);
       advance();
     }
 
-    if (current.scopeDepth > 0) {
-      current.locals[current.len++].depth = current.scopeDepth;
+    if (frame.compiler->scopeDepth > 0) {
+      frame.compiler->locals[frame.compiler->len++].depth = frame.compiler->scopeDepth;
       break;
     }
     // if local var, we skip this???
     size_t BsobjStringConstIndex = internString(&strings, cur, src);
-    WRITE_BYTECODE(chunk, OP_GLOBALVAR_DEF, cur.line);
-    WRITE_BYTECODE(chunk, BsobjStringConstIndex, cur.line);
+    WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_DEF, cur.line);
+    WRITE_BYTECODE(frame.chunk, BsobjStringConstIndex, cur.line);
   } break;
   case TOKEN_PRINT: {
     Token printToken = parser.current;
     advance();
     expression();
-    WRITE_BYTECODE(chunk, OP_PRINT, printToken.line);
+    WRITE_BYTECODE(frame.chunk, OP_PRINT, printToken.line);
   } break;
   case TOKEN_LEFT_BRACE: {
-    const unsigned scope = current.scopeDepth++;
+    const unsigned scope = frame.compiler->scopeDepth++;
 
     while (!declaration(src) && parser.current.tt != TOKEN_RIGHT_BRACE &&
            parser.current.tt != TOKEN_EOF) {
@@ -75,15 +75,15 @@ CompilerStatus declaration(const char *src) {
       //
     }
     // sync stack and locals
-    for (unsigned i = current.len; i >= 0 && current.locals[i].depth != scope;
+    for (unsigned i = frame.compiler->len; i >= 0 && frame.compiler->locals[i].depth != scope;
          i--) {
-      WRITE_BYTECODE(chunk, OP_POP, parser.current.line);
-      current.len--;
+      WRITE_BYTECODE(frame.chunk, OP_POP, parser.current.line);
+      frame.compiler->len--;
     }
 
   } break;
   case TOKEN_EOF: {
-    WRITE_BYTECODE(chunk, OP_RETURN, parser.current.line);
+    WRITE_BYTECODE(frame.chunk, OP_RETURN, parser.current.line);
     return !parser.hadError;
   }
   default:

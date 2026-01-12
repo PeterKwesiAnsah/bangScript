@@ -84,6 +84,9 @@ typedef struct {
 #define C_BOOL_TO_BS_BOOLEAN(cbool) ((Value){.value={.boolean=cbool},.type=TYPE_BOOL})
 #define BS_BOOLEAN_TO_C_BOOL(bsbool) (bsbool.value.boolean)
 
+typedef DECLARE_ARRAY_TYPE(Value, ValueArray);
+extern ValueArray constants;
+
 size_t addConstant(Value);
 
 //inline size_t internString(Table *, BsObjString **, Token , const char *);
