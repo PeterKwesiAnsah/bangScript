@@ -15,7 +15,7 @@ typedef struct {
     Chunk chunk;
     const char *src;
     u_int8_t *ip;
-    Value *constants;
+    Constants *constants;
     Compiler *compiler;
 } Frame;
 

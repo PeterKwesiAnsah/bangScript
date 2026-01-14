@@ -1,7 +1,7 @@
 #include "compiler.h"
 #include "disassembler.h"
-#include "vm.h"
 #include "readonly.h"
+#include "vm.h"
 #include <alloca.h>
 #include <assert.h>
 #include <stdio.h>
@@ -43,7 +43,8 @@ int main(int argc, char *args[]) {
   frame.compiler = (Compiler *)alloca(sizeof(Compiler));
   frame.compiler->len=0;
   frame.compiler->scopeDepth=0;
-  frame.constants = constants.arr;
+  Constants constants={0};
+  frame.constants = &constants;
 
   if (argc == 1) {
     mode = REPL_MODE;

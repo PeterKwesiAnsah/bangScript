@@ -1,7 +1,6 @@
 #include "parser.h"
 #include "chunk.h"
 #include "compiler.h"
-#include "darray.h"
 #include "readonly.h"
 #include "scanner.h"
 #include "table.h"
@@ -165,7 +164,7 @@ void unary(bool isAssignExp) {
 static void number(bool isAssignExp) {
   Token numToken = parser.previous;
   size_t constantIndex =
-      addConstant(C_DOUBLE_TO_BS_NUMBER(atof(frame.src + numToken.start)));
+      addConstant(C_DOUBLE_TO_BS_NUMBER(atof(frame.src + numToken.start)),frame.constants);
   if (constantIndex >= CONSTANT_LIMIT) {
     // Write opcode
     WRITE_BYTECODE(frame.chunk, OP_CONSTANT_LONG, numToken.line);
@@ -252,7 +251,7 @@ static void identifier(bool isAssignExp) {
         WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
     }
       return;
-  } else {
+  } else
     if (assignment) {
       const unsigned localDepth = current->locals[OP_CODE_OPERAND_INDEX].depth;
       current->locals[OP_CODE_OPERAND_INDEX].depth = -1;
@@ -267,7 +266,6 @@ static void identifier(bool isAssignExp) {
         WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
     }
   }
-}
 
 static void nil(bool isAssignExp) {
   Token nilToken = parser.previous;

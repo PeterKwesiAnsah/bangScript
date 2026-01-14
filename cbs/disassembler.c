@@ -2,13 +2,12 @@
 #include "chunk.h"
 #include "readonly.h"
 #include "line.h"
-#include "darray.h"
+#include "vm.h"
 #include <stdio.h>
 #include <stdint.h>
 
-extern DECLARE_ARRAY(Value, constants);
-extern DECLARE_ARRAY(u_int8_t, chunk);
 
+extern Frame frame;
 static const char *opcodeNames[] = {
     "OP_CONSTANT_ZER0",
     "OP_CONSTANT",
@@ -32,12 +31,12 @@ static const char *opcodeNames[] = {
 };
 
 static void printConstant(uint8_t constantIndex) {
-    if (constantIndex >= constants.len) {
+    if (constantIndex >= frame.constants->len) {
         printf("<invalid constant index %d>", constantIndex);
         return;
     }
 
-    Value constant = constants.arr[constantIndex];
+    Value constant = frame.constants->arr[constantIndex];
     switch (constant.type) {
         case TYPE_NUMBER:
             printf("%g", BS_NUMBER_TO_C_DOUBLE(constant));
@@ -68,12 +67,12 @@ static void printConstant(uint8_t constantIndex) {
 }
 
 static void printConstantLong(unsigned int constantIndex) {
-    if (constantIndex >= constants.len) {
+    if (constantIndex >= frame.constants->len) {
         printf("<invalid constant index %u>", constantIndex);
         return;
     }
 
-    Value constant = constants.arr[constantIndex];
+    Value constant = frame.constants->arr[constantIndex];
     switch (constant.type) {
         case TYPE_NUMBER:
             printf("%g", BS_NUMBER_TO_C_DOUBLE(constant));
@@ -186,16 +185,16 @@ DisassemblerStatus disassembleChunk(const char *filename) {
     printf("LINE | OFFSET | INSTRUCTION          | DETAILS\n");
     printf("-----|--------|----------------------|----------------------------------\n");
 
-    if (chunk.len == 0) {
-        printf("<empty chunk>\n");
+    if (frame.chunk.len == 0) {
+        printf("<empty frame.chunk>\n");
         return DISASSEMBLER_OK;
     }
 
-    uint8_t *ip = chunk.arr;
-    uint8_t *end = chunk.arr + chunk.len;
+    uint8_t *ip = frame.chunk.arr;
+    uint8_t *end = frame.chunk.arr + frame.chunk.len;
 
     while (ip < end) {
-        DisassemblerStatus status = disassembleInstruction(ip, chunk.arr);
+        DisassemblerStatus status = disassembleInstruction(ip, frame.chunk.arr);
         if (status == DISASSEMBLER_ERROR) {
             return status;
         }
@@ -239,7 +238,7 @@ DisassemblerStatus disassembleChunk(const char *filename) {
                 break;
 
             default:
-                printf("Error: Unknown opcode %d at offset %zu\n", instruction, ip - chunk.arr - 1);
+                printf("Error: Unknown opcode %d at offset %zu\n", instruction, ip - frame.chunk.arr - 1);
                 return DISASSEMBLER_ERROR;
         }
     }

@@ -1,6 +1,5 @@
 #include "chunk.h"
 #include "vm.h"
-#include "darray.h"
 #include "readonly.h"
 #include "stack.h"
 #include "table.h"
@@ -8,6 +7,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+
 #define READ_BYTE_CODE() (*frame.ip++)
 #define EVALUATE_BIN_EXP(operator) do {\
     Value b=pop();\
@@ -29,14 +30,14 @@ ProgramStatus run(){
         switch(READ_BYTE_CODE()){
             case OP_CONSTANT_ZER0:
             {
-                Value value= frame.constants[CONSTANT_ZERO_INDEX];
+                Value value= frame.constants->arr[CONSTANT_ZERO_INDEX];
                 push(value);
             }
             break;
             case OP_CONSTANT:
             {
                 uint8_t index = READ_BYTE_CODE();
-                Value value= frame.constants[index];
+                Value value= frame.constants->arr[index];
                 push(value);
             }
             break;
@@ -49,7 +50,7 @@ ProgramStatus run(){
                 index= index | lowByte;
                 index= index | ((unsigned int)midByte << 8);
                 index= index | ((unsigned int)highByte << 16);
-                Value value= frame.constants[index];
+                Value value= frame.constants->arr[index];
                 push(value);
             }
             break;
@@ -246,7 +247,7 @@ ProgramStatus run(){
             //TODO: OP_GLOBALVAR_LONG_DEF
             case OP_GLOBALVAR_DEF:{
                 uint8_t varConstIndex = READ_BYTE_CODE();
-                Value var= frame.constants[varConstIndex];
+                Value var= frame.constants->arr[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value evalrhs=pop();
                 Tset(&globals, (BsObjString *)var.value.obj, evalrhs);
@@ -257,7 +258,7 @@ ProgramStatus run(){
                 uint8_t *cacheHashIndexIp=frame.ip+1;
                 uint8_t varConstIndex = READ_BYTE_CODE();
 
-                Value var= frame.constants[varConstIndex];
+                Value var= frame.constants->arr[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value value;
                 uint16_t cacheHashIndex=0;
@@ -287,7 +288,7 @@ ProgramStatus run(){
             case OP_GLOBALVAR_ASSIGN:
             {
                 uint8_t varConstIndex = READ_BYTE_CODE();
-                Value var= frame.constants[varConstIndex];
+                Value var= frame.constants->arr[varConstIndex];
                 assert(var.type==TYPE_OBJ);
                 Value evalrhs=pop();
                 //TODO: check for undefined vars

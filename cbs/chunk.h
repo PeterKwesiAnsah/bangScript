@@ -2,6 +2,7 @@
 #define CHUNK_H
 #include "line.h"
 #include "darray.h"
+#include <stdint.h>
 
 typedef enum {
     OP_CONSTANT_ZER0,
@@ -29,19 +30,9 @@ typedef enum {
     OP_RETURN
 } BS_OP_CODES;
 
-#define DECLARE_CHUNK_TYPE(name) \
-typedef struct {   \
-    size_t cap;\
-    size_t len;\
-    u_int8_t *arr;\
-    uint8_t *ip;\
-} name;
 
-DECLARE_CHUNK_TYPE(Chunk)
 
-#define DECLARE_CHUNK(name) \
-    DECLARE_ARRAY(u_int8_t, name); \
-    uint8_t *ip;
+DECLARE_ARRAY_TYPE(uint8_t, Chunk)
 
 #define WRITE_BYTECODE(chunk,byte,line) do{ \
 append(chunk,u_int8_t,byte);\

@@ -96,10 +96,10 @@ CompilerStatus declaration(const char *src) {
 CompilerStatus compile(const char *src) {
 
   Tinit(&strings);
-  addConstant(C_DOUBLE_TO_BS_NUMBER(0));
-  addConstant(C_BOOL_TO_BS_BOOLEAN(true));
-  addConstant(C_BOOL_TO_BS_BOOLEAN(false));
-  addConstant((Value){.type = TYPE_NIL, .value = {}});
+  addConstant(C_DOUBLE_TO_BS_NUMBER(0),frame.constants);
+  addConstant(C_BOOL_TO_BS_BOOLEAN(true),frame.constants);
+  addConstant(C_BOOL_TO_BS_BOOLEAN(false),frame.constants);
+  addConstant((Value){.type = TYPE_NIL, .value = {}},frame.constants);
 
   // set the ball rolling
   advance();

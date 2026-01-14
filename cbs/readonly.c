@@ -1,11 +1,12 @@
 #include "readonly.h"
 #include "darray.h"
 #include "table.h"
+#include "vm.h"
 
 
 
-ValueArray constants={};
 Table strings={};
+extern Frame frame;
 
 
 static uint32_t hashString(const char* key, int length) {
@@ -41,7 +42,7 @@ static uint32_t hashString(const char* key, int length) {
         newVal.type = TYPE_OBJ;
         newVal.value.obj = (BsObj *)newObj;
 
-        size_t outIndex = addConstant(newVal);
+        size_t outIndex = addConstant(newVal,frame.constants);
 
         // Store index in string table for future lookups
         Value indexVal = { .type = TYPE_NUMBER, .value.num = outIndex };
@@ -54,8 +55,8 @@ static uint32_t hashString(const char* key, int length) {
     }
 }
 
-size_t addConstant(Value c){
-    size_t index=constants.len;
-    append(constants,Value, c);
+size_t addConstant(Value BsValue, Constants *constants){
+    size_t index=constants->len;
+    appendPtr(constants,Value, BsValue);
     return index;
 };
