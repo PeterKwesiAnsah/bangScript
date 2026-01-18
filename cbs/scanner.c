@@ -109,7 +109,7 @@ Token scanTokens(const char *src){
           }
            if(isEOF(c)){
                 scanerr="Unterminated String\n";
-                return (Token){state.start+1,0,state.line,TOKEN_ERROR};
+                return (Token){(size_t)scanerr,0,state.line,TOKEN_ERROR};
            }
             state.cur++;//consume closing "
            return (Token){state.start+1,(state.cur-(state.start+2)),state.line,TOKEN_STRING};
@@ -249,7 +249,7 @@ Token scanTokens(const char *src){
                     if(metDot){
                         scanerr="Malformed number literal\n";
                         state.cur++;
-                        return (Token){state.start,0,state.line,TOKEN_ERROR};
+                        return (Token){(size_t)scanerr,0,state.line,TOKEN_ERROR};
                     }
                      metDot=1;
                      state.cur++;
@@ -259,7 +259,7 @@ Token scanTokens(const char *src){
                 return (Token){state.start,length,state.line,TOKEN_NUMBER};
             }else{
                 scanerr="Unexpected character\n";
-                return (Token){state.start,0,state.line,TOKEN_ERROR};
+                return (Token){(size_t)scanerr,0,state.line,TOKEN_ERROR};
             }
         }
     }
