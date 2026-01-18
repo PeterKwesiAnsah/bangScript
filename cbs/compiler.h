@@ -23,5 +23,5 @@ typedef struct {
 } Compiler;
 
 CompilerStatus compile(const char *);
-CompilerStatus declaration(const char *);
+void declaration(const char *);
 #endif

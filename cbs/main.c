@@ -110,8 +110,13 @@ int main(int argc, char *args[]) {
       }
     }
     switch (mode) {
+    //TODO:
     case REPL_MODE:
+    {
+        printf("Running bangscript in REPL mode");
+    }
       break;
+    //TODO:
     case HELP_MODE:
       break;
     case DISASSEMBLER_MODE: {

@@ -35,6 +35,8 @@ void expression();
 static void parsePrecedence(Precedence precedence);
 void advance();
 
+void errorAt(Token *, const char *,const char *);
+
 //production rules for expressions
 static void number(bool);
 static void string(bool);

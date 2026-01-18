@@ -1,9 +1,9 @@
 #include "parser.h"
 #include "chunk.h"
-#include "compiler.h"
 #include "readonly.h"
 #include "scanner.h"
 #include "table.h"
+#include "setjmp.h"
 #include "vm.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -18,7 +18,11 @@ extern const char *scanerr;
 // table of a set of unique(textually) BsObjString
 extern Table strings;
 
-extern Compiler *current;
+extern Frame frame;
+
+extern jmp_buf buf;
+
+
 
 extern inline size_t internString(Table *, Token, const char *);
 
@@ -67,16 +71,15 @@ void advance() {
     parser.current = scanTokens(frame.src);
     if (parser.current.tt != TOKEN_ERROR)
       break;
-    fprintf(stderr, "%s at line %d", scanerr, parser.current.line);
-    parser.hadError = true;
+    errorAt(&parser.current, "", (char *)0);
   }
 }
 static void parsePrecedence(Precedence precedence) {
   advance();
   ParseFn prefixRule = rules[parser.previous.tt].prefix;
   if (prefixRule == NULL) {
-    fputs("Invalid Expression", stderr);
-    parser.hadError = true;
+    errorAt(&parser.previous, "Invalid Expression.", frame.src);
+
     return;
   }
   prefixRule(precedence == PREC_ASSIGNMENT);
@@ -91,8 +94,7 @@ static void parsePrecedence(Precedence precedence) {
 void expression() {
   parsePrecedence(PREC_ASSIGNMENT);
   if (parser.current.tt != TOKEN_SEMICOLON) {
-    fprintf(stderr, "Expected a semi-colon but got %d\n", parser.current.tt);
-    parser.hadError = true;
+    errorAt(&parser.previous, "Expected a semi-colon after token.", frame.src);
     return;
   }
   advance();
@@ -100,8 +102,8 @@ void expression() {
 void grouping(bool isAssignExp) {
   parsePrecedence(PREC_ASSIGNMENT);
   if (parser.current.tt != TOKEN_RIGHT_PAREN) {
-    fprintf(stderr, "Expected Right Paren but got %d\n", parser.current.tt);
-    parser.hadError = true;
+    errorAt(&parser.previous, "Expected a right parenthesi after token.",
+            frame.src);
     return;
   }
   advance();
@@ -163,8 +165,8 @@ void unary(bool isAssignExp) {
 
 static void number(bool isAssignExp) {
   Token numToken = parser.previous;
-  size_t constantIndex =
-      addConstant(C_DOUBLE_TO_BS_NUMBER(atof(frame.src + numToken.start)),frame.constants);
+  size_t constantIndex = addConstant(
+      C_DOUBLE_TO_BS_NUMBER(atof(frame.src + numToken.start)), frame.constants);
   if (constantIndex >= CONSTANT_LIMIT) {
     // Write opcode
     WRITE_BYTECODE(frame.chunk, OP_CONSTANT_LONG, numToken.line);
@@ -191,8 +193,10 @@ static void string(bool isAssignExp) {
     WRITE_BYTECODE(frame.chunk, OP_CONSTANT_LONG, strToken.line);
     // Write operand as 3 bytes
     WRITE_BYTECODE(frame.chunk, stringLiteralIndex & 0xFF, strToken.line);
-    WRITE_BYTECODE(frame.chunk, (stringLiteralIndex >> 8) & 0xFF, strToken.line);
-    WRITE_BYTECODE(frame.chunk, (stringLiteralIndex >> 16) & 0xFF, strToken.line);
+    WRITE_BYTECODE(frame.chunk, (stringLiteralIndex >> 8) & 0xFF,
+                   strToken.line);
+    WRITE_BYTECODE(frame.chunk, (stringLiteralIndex >> 16) & 0xFF,
+                   strToken.line);
     return;
   }
 
@@ -220,15 +224,18 @@ static void identifier(bool isAssignExp) {
   uint8_t OP_CODE_GET = 0;
   uint8_t OP_CODE_SET = 0;
 
-  int OP_CODE_OPERAND_INDEX = current->len;
+  int OP_CODE_OPERAND_INDEX = frame.compiler->len;
 
-  if (current->scopeDepth == 0)
+  if (frame.compiler->scopeDepth == 0)
     goto ParseCompileGlobals;
 
   for (; OP_CODE_OPERAND_INDEX >= 0; OP_CODE_OPERAND_INDEX--) {
-    if (identifierToken.len == current->locals[OP_CODE_OPERAND_INDEX].name.len &&
-        current->locals[OP_CODE_OPERAND_INDEX].depth != -1 &&
-        !memcmp(frame.src + identifierToken.start, frame.src + current->locals[OP_CODE_OPERAND_INDEX].name.start,
+    if (identifierToken.len ==
+            frame.compiler->locals[OP_CODE_OPERAND_INDEX].name.len &&
+        frame.compiler->locals[OP_CODE_OPERAND_INDEX].depth != -1 &&
+        !memcmp(frame.src + identifierToken.start,
+                frame.src +
+                    frame.compiler->locals[OP_CODE_OPERAND_INDEX].name.start,
                 identifierToken.len)) {
       break;
     }
@@ -243,33 +250,47 @@ static void identifier(bool isAssignExp) {
       // TODO: Handle long indexes
       WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_ASSIGN, identifierToken.line);
       WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
-    }else {
-        WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_GET, identifierToken.line);
-        WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
-        // cache hash index
-        WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
-        WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
-    }
-      return;
-  } else
-    if (assignment) {
-      const unsigned localDepth = current->locals[OP_CODE_OPERAND_INDEX].depth;
-      current->locals[OP_CODE_OPERAND_INDEX].depth = -1;
-      advance();
-      expression();
-      current->locals[OP_CODE_OPERAND_INDEX].depth = localDepth;
-      // TODO: Handle long indexes
-      WRITE_BYTECODE(frame.chunk, OP_LOCALVAR_ASSIGN, identifierToken.line);
-      WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
     } else {
-        WRITE_BYTECODE(frame.chunk, OP_LOCALVAR_GET, identifierToken.line);
-        WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_GET, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+      // cache hash index
+      WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
+      WRITE_BYTECODE(frame.chunk, 0, identifierToken.line);
     }
+    return;
+  } else if (assignment) {
+    const unsigned localDepth =
+        frame.compiler->locals[OP_CODE_OPERAND_INDEX].depth;
+    frame.compiler->locals[OP_CODE_OPERAND_INDEX].depth = -1;
+    advance();
+    expression();
+    frame.compiler->locals[OP_CODE_OPERAND_INDEX].depth = localDepth;
+    // TODO: Handle long indexes
+    WRITE_BYTECODE(frame.chunk, OP_LOCALVAR_ASSIGN, identifierToken.line);
+    WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
+  } else {
+    WRITE_BYTECODE(frame.chunk, OP_LOCALVAR_GET, identifierToken.line);
+    WRITE_BYTECODE(frame.chunk, OP_CODE_OPERAND_INDEX, identifierToken.line);
   }
+}
 
 static void nil(bool isAssignExp) {
   Token nilToken = parser.previous;
   WRITE_BYTECODE(frame.chunk, OP_CONSTANT, nilToken.line);
   // write operand Index
   WRITE_BYTECODE(frame.chunk, CONSTANT_NIL_INDEX, nilToken.line);
+}
+
+void errorAt(Token *token, const char *message, const char *src) {
+  fprintf(stderr, "[line %d] Error", token->line);
+  if (token->tt == TOKEN_EOF) {
+    fprintf(stderr, " at end");
+  } else if (token->tt == TOKEN_ERROR) {
+    // Nothing.
+  } else {
+    fprintf(stderr, " at '%.*s'", token->len, (char *)src + token->start);
+  }
+  fprintf(stderr, ": %s\n", message);
+  parser.hadError = true;
+  longjmp(buf,1);
 }
