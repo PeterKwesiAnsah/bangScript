@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include "darray.h"
 #include "disassembler.h"
 #include "readonly.h"
 #include "vm.h"
@@ -41,9 +42,9 @@ const char *readSourceFintoBuffer(const char *filename) {
 int main(int argc, char *args[]) {
   const char *filename = NULL;
   frame.compiler = (Compiler *)alloca(sizeof(Compiler));
-  frame.compiler->len=0;
-  frame.compiler->scopeDepth=0;
-  Constants constants={0};
+  frame.compiler->len = 0;
+  frame.compiler->scopeDepth = 0;
+  Constants constants = {0};
   frame.constants = &constants;
 
   if (argc == 1) {
@@ -110,13 +111,57 @@ int main(int argc, char *args[]) {
       }
     }
     switch (mode) {
-    //TODO:
-    case REPL_MODE:
-    {
-        printf("Running bangscript in REPL mode");
-    }
-      break;
-    //TODO:
+    // TODO:
+    case REPL_MODE: {
+      printf("Running bangscript in REPL mode/n");
+      DECLARE_ARRAY_TYPE(char, Input)
+      size_t scopeDepth = 0;
+      size_t start = 0;
+      Input src;
+      // Repeat
+      for (;;) {
+        printf(">>>");
+      // read a single line
+      Read:
+        while (1) {
+          int ch = getchar();
+          if (ch == EOF) {
+            src.arr[src.len] = '\0';
+            if (scopeDepth > 0) {
+              printf("...");
+              continue;
+            }
+            break;
+          }
+          append(src, char, ch);
+
+          switch (ch) {
+          case '{': {
+            scopeDepth++;
+          } break;
+          case '}': {
+            scopeDepth--;
+          } break;
+          case 'q':
+          // starts a line, q or quit should exit the REPL
+          case '\n': {
+            if (scopeDepth > 0) {
+              // more
+              printf("...");
+              continue;
+              // if next character is EOF...you do more
+              // else continue loop
+            }
+            start = src.len;
+          } break;
+          default:
+            break;
+          }
+        }
+      }
+
+    } break;
+    // TODO:
     case HELP_MODE:
       break;
     case DISASSEMBLER_MODE: {
