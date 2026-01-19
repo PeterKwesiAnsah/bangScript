@@ -22,6 +22,6 @@ typedef struct {
   unsigned scopeDepth;
 } Compiler;
 
-CompilerStatus compile(const char *);
-void declaration(const char *);
+CompilerStatus compile();
+void declaration();
 #endif

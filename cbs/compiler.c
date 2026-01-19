@@ -16,7 +16,7 @@ extern Frame frame;
 jmp_buf buf;
 
 // parse,complile statements
-void declaration(const char *src) {
+void declaration() {
   switch (parser.current.tt) {
   // variable declaration
   case TOKEN_VAR: {
@@ -29,7 +29,7 @@ void declaration(const char *src) {
     }
     if (cur.tt != TOKEN_IDENTIFIER) {
       errorAt(&parser.previous, "Variable declaration needs a variable name.",
-              src);
+              frame.src);
     }
     advance();
     // var foo=0;
@@ -40,7 +40,7 @@ void declaration(const char *src) {
     } else {
       // var foo;
       if (parser.current.tt != TOKEN_SEMICOLON) {
-        errorAt(&parser.current, "Expected a semi-colon instead.", src);
+        errorAt(&parser.current, "Expected a semi-colon instead.", frame.src);
       }
       WRITE_BYTECODE(frame.chunk, OP_CONSTANT, cur.line);
       WRITE_BYTECODE(frame.chunk, CONSTANT_NIL_INDEX, cur.line);
@@ -53,7 +53,7 @@ void declaration(const char *src) {
       break;
     }
 
-    size_t BsobjStringConstIndex = internString(&strings, cur, src);
+    size_t BsobjStringConstIndex = internString(&strings, cur, frame.src);
     WRITE_BYTECODE(frame.chunk, OP_GLOBALVAR_DEF, cur.line);
     WRITE_BYTECODE(frame.chunk, BsobjStringConstIndex, cur.line);
   } break;
@@ -65,23 +65,24 @@ void declaration(const char *src) {
   } break;
   case TOKEN_LEFT_BRACE: {
     const unsigned scope = frame.compiler->scopeDepth++;
-
+    advance();
     while (parser.current.tt != TOKEN_RIGHT_BRACE &&
            parser.current.tt != TOKEN_EOF) {
-      declaration(src);
+      declaration();
     };
 
-    if (parser.current.tt == TOKEN_EOF ) {
-        errorAt(&parser.current, "Expected a closing right bracket.", src);
-        return;
+    if (parser.current.tt == TOKEN_EOF) {
+      errorAt(&parser.current, "Expected a closing right bracket.", frame.src);
+      return;
     }
     // sync stack and locals
-    for (unsigned i = frame.compiler->len;
+    for (int i = frame.compiler->len - 1;
          i >= 0 && frame.compiler->locals[i].depth != scope; i--) {
       WRITE_BYTECODE(frame.chunk, OP_POP, parser.current.line);
       frame.compiler->len--;
     }
-
+    frame.compiler->scopeDepth--;
+    advance();
   } break;
   case TOKEN_EOF: {
     WRITE_BYTECODE(frame.chunk, OP_RETURN, parser.current.line);
@@ -92,7 +93,7 @@ void declaration(const char *src) {
     break;
   }
 }
-CompilerStatus compile(const char *src) {
+CompilerStatus compile() {
 
   Tinit(&strings);
   addConstant(C_DOUBLE_TO_BS_NUMBER(0), frame.constants);
@@ -102,10 +103,11 @@ CompilerStatus compile(const char *src) {
 
   // set the ball rolling
   advance();
-  if(setjmp(buf)) return !parser.hadError;
+  if (setjmp(buf))
+    return !parser.hadError;
 
   while (parser.current.tt != TOKEN_EOF) {
-    declaration(src);
+    declaration();
   };
   return !parser.hadError;
 }
