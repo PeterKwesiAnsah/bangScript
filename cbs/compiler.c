@@ -84,10 +84,6 @@ void declaration() {
     frame.compiler->scopeDepth--;
     advance();
   } break;
-  case TOKEN_EOF: {
-    WRITE_BYTECODE(frame.chunk, OP_RETURN, parser.current.line);
-    break;
-  }
   default:
     expression();
     break;
@@ -109,5 +105,6 @@ CompilerStatus compile() {
   while (parser.current.tt != TOKEN_EOF) {
     declaration();
   };
+  WRITE_BYTECODE(frame.chunk, OP_RETURN, parser.current.line);
   return !parser.hadError;
 }
