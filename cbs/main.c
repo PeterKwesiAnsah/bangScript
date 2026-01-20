@@ -110,77 +110,78 @@ int main(int argc, char *args[]) {
         break;
       }
     }
-    switch (mode) {
-    // TODO:
-    case REPL_MODE: {
-      printf("Running bangscript in REPL mode/n");
-      DECLARE_ARRAY_TYPE(char, Input)
-      size_t scopeDepth = 0;
-      size_t start = 0;
-      Input src;
-      // Repeat
-      for (;;) {
-        printf(">>>");
-      // read a single line
-      Read:
-        while (1) {
-          int ch = getchar();
-          if (ch == EOF) {
+  }
+
+  switch (mode) {
+  case REPL_MODE: {
+    printf("Running bangscript in REPL mode\n");
+    DECLARE_ARRAY_TYPE(char, Input)
+    size_t scopeDepth = 0;
+    size_t start = 0;
+    Input src = {0};
+
+  Loop:
+    for (;;) {
+      printf(">>> ");
+    // read src from stdin
+    Read:
+      while (1) {
+        int ch = getchar();
+        if (ch == EOF) {
+          return SUCCESS;
+        } else if (ch == '\n') {
+          // We don't break out easily
+          //  if scopedepth is 0 and the buffer src looks well like a completed
+          //  statement then we breakout else we keep on asking for input
+          if (src.cap && src.len) {
             src.arr[src.len] = '\0';
-            if (scopeDepth > 0) {
-              printf("...");
-              continue;
-            }
-            break;
           }
-          append(src, char, ch);
-
-          switch (ch) {
-          case '{': {
-            scopeDepth++;
-          } break;
-          case '}': {
-            scopeDepth--;
-          } break;
-          case 'q':
-          // starts a line, q or quit should exit the REPL
-          case '\n': {
-            if (scopeDepth > 0) {
-              // more
-              printf("...");
-              continue;
-              // if next character is EOF...you do more
-              // else continue loop
-            }
-            start = src.len;
-          } break;
-          default:
-            break;
+          if (scopeDepth > 0) {
+            //TODO: support copy and paste
+            printf("... ");
+            continue;
           }
+          break;
         }
+        if (ch == '{') {
+          scopeDepth++;
+        } else if (ch == '}') {
+          scopeDepth--;
+        }
+        append(src, char, ch);
       }
-
-    } break;
-    // TODO:
-    case HELP_MODE:
-      break;
-    case DISASSEMBLER_MODE: {
-      frame.src = readSourceFintoBuffer(filename);
-      CompilerStatus status = compile(frame.src);
+    Evaluate:
+      if (src.len == 0)
+        continue;
+      if (!strcmp("q", src.arr) || !strcmp("quit", src.arr))
+        return SUCCESS;
+      frame.src = src.arr;
+      CompilerStatus status = compile();
       if (status == COMPILER_ERROR)
-        return status;
-      return disassembleChunk(filename);
-    } break;
-    case SCRIPT_MODE: {
-      frame.src = readSourceFintoBuffer(filename);
-      CompilerStatus status = compile(frame.src);
-      if (status == COMPILER_ERROR)
-        return status;
-      return run();
-    } break;
-    default:
-      break;
+        continue;
+      run();
+      src.len = 0;
     }
+  } break;
+  // TODO:
+  case HELP_MODE:
+    break;
+  case DISASSEMBLER_MODE: {
+    frame.src = readSourceFintoBuffer(filename);
+    CompilerStatus status = compile();
+    if (status == COMPILER_ERROR)
+      return status;
+    return disassembleChunk(filename);
+  } break;
+  case SCRIPT_MODE: {
+    frame.src = readSourceFintoBuffer(filename);
+    CompilerStatus status = compile();
+    if (status == COMPILER_ERROR)
+      return status;
+    return run();
+  } break;
+  default:
+    break;
   }
   return 0;
 }
