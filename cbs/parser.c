@@ -2,8 +2,8 @@
 #include "chunk.h"
 #include "readonly.h"
 #include "scanner.h"
-#include "table.h"
 #include "setjmp.h"
+#include "table.h"
 #include "vm.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,8 +21,6 @@ extern Table strings;
 extern Frame frame;
 
 extern jmp_buf buf;
-
-
 
 extern inline size_t internString(Table *, Token, const char *);
 
@@ -182,7 +180,11 @@ static void number(bool isAssignExp) {
   WRITE_BYTECODE(frame.chunk, constantIndex, numToken.line);
 }
 static void string(bool isAssignExp) {
-
+  // TODO:
+  // need to free values that belong to locals after they are out of scope
+  //  Since we are interning strings, we need to before
+  //  perhaps we can keep a count of all the locations that benefits from it
+  //  ...if all locations are out of scope we can free them
   Token strToken = parser.previous;
   // Value value;
 
@@ -224,7 +226,7 @@ static void identifier(bool isAssignExp) {
   uint8_t OP_CODE_GET = 0;
   uint8_t OP_CODE_SET = 0;
 
-  int OP_CODE_OPERAND_INDEX = frame.compiler->len;
+  int OP_CODE_OPERAND_INDEX = frame.compiler->len - 1;
 
   if (frame.compiler->scopeDepth == 0)
     goto ParseCompileGlobals;
@@ -242,6 +244,11 @@ static void identifier(bool isAssignExp) {
   }
 
   if (OP_CODE_OPERAND_INDEX == -1) {
+      // TODO:
+      // need to free values that belong to locals after they are out of scope
+      //  Since we are interning strings, we need to before
+      //  perhaps we can keep a count of all the locations that benefits from it
+      //  ...if all locations are out of scope we can free them
   ParseCompileGlobals:
     OP_CODE_OPERAND_INDEX = internString(&strings, identifierToken, frame.src);
     if (assignment) {
@@ -292,5 +299,5 @@ void errorAt(Token *token, const char *message, const char *src) {
   }
   fprintf(stderr, ": %s\n", message);
   parser.hadError = true;
-  longjmp(buf,1);
+  longjmp(buf, 1);
 }
