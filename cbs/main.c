@@ -13,11 +13,15 @@ typedef enum {
   DISASSEMBLER_MODE,
   HELP_MODE,
   REPL_MODE,
-  SCRIPT_MODE
+  SCRIPT_MODE,
+  EVAL_MODE
 } OperationMode;
 
 Frame frame;
 
+// use WASM factory module index.mjs -sMODULARIZE
+//  use EMSCRIPTEN_KEEPALIVE to prevent emcc from deadcoding functions we need
+//  to call from Javascript
 OperationMode mode = SCRIPT_MODE;
 
 const char *readSourceFintoBuffer(const char *filename) {
@@ -55,6 +59,7 @@ int main(int argc, char *args[]) {
     // bangscript <filename> --disassembler
     // bangscript <filename> -d
     // bangscript <filename>
+    // Todo: eval mode / -e flag Usage bangscript -e "<program source>"
     const char *flags[] = {
         [DISASSEMBLER_MODE] = "diassembler", [HELP_MODE] = "help"};
 
@@ -88,6 +93,13 @@ int main(int argc, char *args[]) {
           }
           fprintf(stderr, "Unknown flag: %s\n", arg);
           exit(1);
+        } break;
+        case 'e': {
+          if (strlen(args[i]) == 2) {
+            // help shorthand
+            mode = EVAL_MODE;
+            break;
+          }
         } break;
         case '-': {
           for (int j = 0; j < sizeof(flags) / sizeof *flags; j++) {
@@ -137,7 +149,7 @@ int main(int argc, char *args[]) {
             src.arr[src.len] = '\0';
           }
           if (scopeDepth > 0) {
-            //TODO: support copy and paste
+            // TODO: support copy and paste
             printf("... ");
             continue;
           }
@@ -156,10 +168,13 @@ int main(int argc, char *args[]) {
       if (!strcmp("q", src.arr) || !strcmp("quit", src.arr))
         return SUCCESS;
       frame.src = src.arr;
+      printf("%s", frame.src);
+      continue;
       CompilerStatus status = compile();
       if (status == COMPILER_ERROR)
         continue;
       run();
+      // TODO: string up inputs in one???
       src.len = 0;
     }
   } break;
@@ -175,6 +190,15 @@ int main(int argc, char *args[]) {
   } break;
   case SCRIPT_MODE: {
     frame.src = readSourceFintoBuffer(filename);
+    CompilerStatus status = compile();
+    if (status == COMPILER_ERROR)
+      return status;
+    return run();
+  } break;
+  case EVAL_MODE: {
+    const char *esrc=filename;
+    size_t srcLen = strlen(esrc);
+    frame.src = esrc;
     CompilerStatus status = compile();
     if (status == COMPILER_ERROR)
       return status;
