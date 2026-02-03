@@ -51,7 +51,8 @@ counter(); // → 3
 - [x] Tree-walk Interpreter
 - [x] Interactive REPL
 - [x] Finalizing Closures
-- [ ] Bytecode VM
+- [x] Bytecode VM
+- [ ] JIT (X86-64 and ARM)  
 
 #### Credits
 This Language is heavily inspired by [lox](https://craftinginterpreters.com/)
