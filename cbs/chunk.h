@@ -35,7 +35,7 @@ DECLARE_ARRAY_TYPE(uint8_t, Chunk)
 #define WRITE_BYTECODE(chunk, byte, line)                                      \
   do {                                                                         \
     addLine(line);                                                             \
-    append(chunk, u_int8_t, byte);                                             \
+    append(chunk, uint8_t, byte);                                             \
   } while (0)
 
 #endif

@@ -24,7 +24,7 @@ void Tcopy(const Table *Told, Table *Tnew) {
   for (i = 0; i < limit; i += 3) {
 
     if (Toldarr[i].key != NULL) {
-      u_int32_t index = Toldarr[i].key->hash % Tnew->cap;
+      uint32_t index = Toldarr[i].key->hash % Tnew->cap;
       Tnode *node = &Tnewarr[index];
       while (node->key != NULL) {
         index = (index + 1) % Tnew->cap;
@@ -35,7 +35,7 @@ void Tcopy(const Table *Told, Table *Tnew) {
     }
 
     if (Toldarr[i + 1].key != NULL) {
-      u_int32_t index = Toldarr[i + 1].key->hash % Tnew->cap;
+      uint32_t index = Toldarr[i + 1].key->hash % Tnew->cap;
       Tnode *node = &Tnewarr[index];
       while (node->key != NULL) {
         index = (index + 1) % Tnew->cap;
@@ -46,7 +46,7 @@ void Tcopy(const Table *Told, Table *Tnew) {
     }
 
     if (Toldarr[i + 2].key != NULL) {
-      u_int32_t index = Toldarr[i + 2].key->hash % Tnew->cap;
+      uint32_t index = Toldarr[i + 2].key->hash % Tnew->cap;
       Tnode *node = &Tnewarr[index];
       while (node->key != NULL) {
         index = (index + 1) % Tnew->cap;
@@ -61,7 +61,7 @@ void Tcopy(const Table *Told, Table *Tnew) {
     if (Toldarr[i].key == NULL)
       continue;
 
-    u_int32_t index = Toldarr[i].key->hash % Tnew->cap;
+    uint32_t index = Toldarr[i].key->hash % Tnew->cap;
     Tnode *node = &Tnewarr[index];
 
     while (node->key != NULL) {
@@ -93,7 +93,7 @@ bool Tgrow(Table *Tcur, Table *Tnew) {
 // true if it inserts into an empty bucket, false if it updated one
 bool Tset(Table *Tinstance, BsObjString *key, Value value) {
   size_t cap = Tinstance->cap;
-  u_int32_t index = key->hash % cap;
+  uint32_t index = key->hash % cap;
   Tnode *node = &Tinstance->arr[index];
 
   while (node->key != key && node->key != NULL) {
@@ -117,9 +117,9 @@ bool Tset(Table *Tinstance, BsObjString *key, Value value) {
 
 // true if entry was  found, false otherwise
 bool Tget(Table *Tinstance, BsObjString *key, Value *value,
-          u_int32_t *foundIndex) {
+          uint32_t *foundIndex) {
   size_t cap = Tinstance->cap;
-  u_int32_t index = key->hash % cap;
+  uint32_t index = key->hash % cap;
   Tnode *node = &Tinstance->arr[index];
 
   while (node->key != key && node->key != NULL) {
@@ -138,7 +138,7 @@ bool Tget(Table *Tinstance, BsObjString *key, Value *value,
 
 bool Tsets(Table *Tinstance, BsObjString *key, Value value) {
   size_t cap = Tinstance->cap;
-  u_int32_t index = key->hash % cap;
+  uint32_t index = key->hash % cap;
   Tnode *node = &Tinstance->arr[index];
 
   while (node->key != NULL) {
@@ -156,7 +156,7 @@ bool Tsets(Table *Tinstance, BsObjString *key, Value value) {
 
 BsObjString *Tgets(Table *Tinstance, BsObjString *key, Value *value) {
   size_t cap = Tinstance->cap;
-  u_int32_t index = key->hash % cap;
+  uint32_t index = key->hash % cap;
   Tnode *node = &Tinstance->arr[index];
 
   while (node->key != NULL &&
@@ -179,7 +179,7 @@ BsObjString *Tgets(Table *Tinstance, BsObjString *key, Value *value) {
 
 bool Tdelete(Table *Tinstance, BsObjString *key) {
   size_t cap = Tinstance->cap;
-  u_int32_t index = key->hash % cap;
+  uint32_t index = key->hash % cap;
   Tnode *node = &Tinstance->arr[index];
 
   while (node->key != NULL && node->key != key) {
@@ -191,7 +191,7 @@ bool Tdelete(Table *Tinstance, BsObjString *key) {
     return false;
   }
 
-  u_int32_t peekIndex = index;
+  uint32_t peekIndex = index;
   Tnode *hole = node;
 
   while (Tinstance->arr[peekIndex = ((peekIndex + 1) % cap)].key != NULL) {
