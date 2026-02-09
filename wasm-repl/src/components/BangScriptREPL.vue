@@ -12,13 +12,14 @@ type HistoryPromptItem = {
 };
 
 const primaryIndicator = ">>> ";
+const secondaryIndicator = "... ";
 
 const inputRef = ref(null);
 const history = ref<HistoryPromptItem[]>([]);
 const currentInput = ref("");
 const cursorVisible = ref(true);
 
-const inputIndicator = ref<">>> " | ">... ">(primaryIndicator);
+const inputIndicator = ref<">>> " | "... ">(primaryIndicator);
 let scopeDepth = ref(0);
 
 function processInput(input: string) {
@@ -35,12 +36,30 @@ function processInput(input: string) {
 		}
 		if (scopeDepth.value == 0) {
 			//completes the prompt
-			currentInput.value = "";
+			//currentInput.value = "";
 			//we execute, get to result and....
-			//add to history
+			history.value.push({
+				indicator: primaryIndicator,
+				input,
+				output: {
+					result: "",
+					programstatus: 0,
+				},
+			});
+			//add to history item
 		} else {
-			currentInput.value = "";
+			inputIndicator.value = secondaryIndicator;
+			//currentInput.value = "";
 			//add to history
+			history.value.push({
+				indicator: primaryIndicator,
+				input,
+				output: {
+					result: "",
+					programstatus: 0,
+				},
+				more: [],
+			});
 		}
 	} else {
 		if (scopeDepth.value === 0) {
@@ -62,13 +81,19 @@ function processInput(input: string) {
 		if (scopeDepth.value == 0) {
 			//completes the prompt
 			inputIndicator.value = primaryIndicator;
-			currentInput.value = "";
+			//currentInput.value = "";
+			history.value[history.value.length - 1].more.push(input);
 			//add to history
+			let pastInputs = history.value[history.value.length - 1].input;
+			history.value[history.value.length - 1].more.forEach((more) => {
+				pastInputs = input + more;
+			});
 			//we execute, get to result and....
 			//add to history
 		} else {
-			currentInput.value = "";
+			//currentInput.value = "";
 			//add to history
+			history.value[history.value.length - 1].more.push(input);
 		}
 	}
 }
@@ -77,7 +102,7 @@ function processInput(input: string) {
 const handleKeydown = (event) => {
 	if (event.key === "Enter") {
 		event.preventDefault();
-		//const input = currentInput.value;
+		processInput(currentInput.value);
 		currentInput.value = "";
 	} else if (event.key === "Backspace") {
 		event.preventDefault();
@@ -136,11 +161,18 @@ const handleTerminalClick = () => {
 			<div class="terminal" ref="terminalRef" @click="handleTerminalClick">
 				<div class="terminal-content">
 					<span class="output">BangScript REPL v1.0.0</span>
-					<!-- <div v-for="(line, index) in terminalLines" :key="index" class="terminal-line">
-            <span v-if="line.startsWith('>>>')" class="prompt-primary">{{ line }}</span>
-            <span v-else-if="line.startsWith('...')" class="prompt-secondary">{{ line }}</span>
-            <span v-else class="output">{{ line }}</span>
-          </div> -->
+					<div
+						v-for="(line, index) in history"
+						:key="index"
+						class="terminal-line"
+					>
+						<span class="prompt-primary"
+							>{{ line.indicator }} {{ line.input }}</span
+						>
+						<span v-for="value in line.more" class="prompt-secondary"
+							>... {{ value }}</span
+						>
+					</div>
 					<div class="current-input-line">
 						<span class="prompt-primary">{{ inputIndicator }}</span>
 						<span class="input-text">{{ currentInput }}</span>
@@ -266,6 +298,7 @@ const handleTerminalClick = () => {
 	font-weight: 600;
 	margin-right: 0.5rem;
 	text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+	display: block;
 }
 
 .output {
