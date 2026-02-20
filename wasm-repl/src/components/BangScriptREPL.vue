@@ -19,7 +19,7 @@ const history = ref<HistoryPromptItem[]>([])
 const currentInput = ref('')
 const cursorVisible = ref(true)
 
-const inputIndicator = ref<'>>> ' | '... '>(primaryIndicator)
+const inputIndicator = ref<typeof primaryIndicator | typeof secondaryIndicator>(primaryIndicator)
 let scopeDepth = ref(0)
 
 function processInput(input: string) {
@@ -154,6 +154,10 @@ const handleTerminalClick = () => {
           <div v-for="(line, index) in history" :key="index" class="terminal-line">
             <span class="prompt-primary">{{ line.indicator }} {{ line.input }}</span>
             <span v-for="value in line.more" class="prompt-secondary">... {{ value }}</span>
+            <span
+              :class="['output', line.output.programstatus ? 'output-success' : 'output-error']"
+              >{{ line.output.result }}</span
+            >
           </div>
           <div class="current-input-line">
             <span class="prompt-primary">{{ inputIndicator }}</span>
@@ -346,6 +350,14 @@ const handleTerminalClick = () => {
   .terminal-line,
   .current-input-line {
     font-size: 0.85rem;
+  }
+
+  .output-success {
+    color: #00ff00;
+  }
+
+  .output-error {
+    color: #ff0000;
   }
 }
 </style>
